@@ -22,7 +22,10 @@ And that it only takes a moment of self-guided exploration to figure out how to 
 And then, maybe a few more clicks or taps or somesuch amd you've got it doing this:
 
 
-https://github.com/user-attachments/assets/69af03df-deff-4ff2-92eb-1aa5e2f192ec
+
+https://github.com/user-attachments/assets/35a32122-0923-4736-95ac-8f74666605e1
+
+
 
 Or this:
 
