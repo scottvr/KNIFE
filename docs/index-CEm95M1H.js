@@ -246,7 +246,7 @@ Error generating stack: `+a.message+`
     vec2 xy = df_mul(zx, zy);
     zx = df_add(df_sub(x2, y2), cx);
     zy = df_add(df_add(xy, xy), cy);
-  `,initialCenter:{x:-.5,y:0},initialZoom:3,initialPalette:0},Qg=Object.freeze(Object.defineProperty({__proto__:null,mandelbrot:_A},Symbol.toStringTag,{value:"Module"})),AA={name:"Power Phi",category:"Power",formula:`
+  `,initialCenter:{x:-.5,y:0},initialZoom:3,initialPalette:"Cosmic"},Qg=Object.freeze(Object.defineProperty({__proto__:null,mandelbrot:_A},Symbol.toStringTag,{value:"Module"})),AA={name:"Power Phi",category:"Power",formula:`
     float p = 1.61803398;
     float r = length(z);
     float theta = atan(z.y, z.x);
