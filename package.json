@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build &&  mv dist/* docs/i || mkdir docs && mv dist/* docs/",
+    "build": "vite build &&  mv dist/* docs/ || mkdir docs && mv dist/* docs/",
     "preview": "vite preview",
     "lint": "tsc --noEmit"
   },
