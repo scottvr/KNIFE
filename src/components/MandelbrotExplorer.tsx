@@ -465,7 +465,7 @@ export const MandelbrotExplorer: React.FC = () => {
           animate={{ opacity: 1, x: 0 }}
           className="bg-black/40 backdrop-blur-md border border-white/10 p-4 rounded-2xl pointer-events-auto"
         >
-          <h1 className="text-xl font-bold tracking-tight mb-1">Infinity Explorer</h1>
+          <h1 className="text-xl font-bold tracking-tight mb-1">NIFE</h1>
           <p className="text-xs text-white/60">{fractals[fractalType].name}</p>
         </motion.div>
 

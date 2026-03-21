@@ -1,3 +1,0 @@
- - name: Create .env file
-        run: |
-          echo "GEMINI_API_KEY=${{ secrets.GEMENI_API_KEY }}" >> dist/.env
