@@ -853,11 +853,14 @@ out vec4 fragColor;`:"precision highp float;"}
     }
 
     float colorIteration = iteration;
-    if (u_colorizer_mode == 1 && iteration < max_i) {
+    if (iteration >= max_i) {
+      colorIteration = max_i;
+    } else if (u_colorizer_mode == 1) {
       colorIteration = min(max_i - 1.0, iteration + max(0.0, u_post_escape_steps));
     } else if (u_colorizer_mode == 2) {
-      float trapSignal = exp(-minTrapDistance / 2.0);
-      colorIteration = clamp((1.0 - trapSignal) * (max_i - 1.0), 0.0, max_i - 1.0);
+      float trapDist = max(minTrapDistance, 1e-9);
+      float trapBands = fract(-log2(trapDist) * 0.45 + (iteration / max_i) * 0.35);
+      colorIteration = clamp(trapBands * (max_i - 1.0), 0.0, max_i - 1.0);
     } else if (u_colorizer_mode == 3) {
       float angleNorm = fract((atan(finalZY, finalZX) + 3.141592653589793) / 6.283185307179586);
       float magNorm = fract(log2(max(1e-12, length(vec2(finalZX, finalZY))) + 1.0) * 0.5);
