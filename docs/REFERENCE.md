@@ -2,7 +2,7 @@
 
 ## What KNIFE is
 
-KNIFE is a real-time fractal exploration app built around a keyboard-first interaction model. Rather than exposing every feature through large persistent controls, it uses a compact interface plus hotkeys, popout panels, overlays, and a help/input map.
+KNIFE is a real-time fractal exploration app built around a keyboard-first interaction model. Rather than exposing every feature through large persistent controls, it uses a compact interface plus hotkeys, popout panels, overlays, and a help/input map. Kess cutter from the interface; more room for your fractals.
 
 Mouse and touch are supported for most important actions, but the keyboard remains the primary control surface.
 
@@ -215,16 +215,11 @@ The app itself already identifies these:
 
 That is actually a good sign: the app is self-aware about its parity story, and the help overlay documents it directly.
 
-## Suggested onboarding language
+## Getting started
 
-A simple sentence near startup would help a lot:
+Just press ? for the full control map. KNIFE is optimized for keyboard-first exploration.
 
-"Press ? for the full control map. KNIFE is optimized for keyboard-first exploration."
-
-That one line would likely reduce a lot of initial confusion.
-
-## Suggested first-session walkthrough
-
+## An Example first-session
 1. Press `?`
 2. Pan with arrow keys or drag
 3. Zoom with `=` / `-` or wheel/pinch
