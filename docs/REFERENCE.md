@@ -2,7 +2,7 @@
 
 ## What KNIFE is
 
-KNIFE is a real-time fractal exploration app built around a keyboard-first interaction model. Rather than exposing every feature through large persistent controls, it uses a compact interface plus hotkeys, popout panels, overlays, and a help/input map. Kess cutter from the interface; more room for your fractals.
+KNIFE is a real-time fractal exploration app built around a keyboard-first interaction model. Rather than exposing every feature through large persistent controls, it uses a compact interface plus hotkeys, popout panels, overlays, and a help/input map. Less clutter in the interface; more room for your fractals.
 
 Mouse and touch are supported for most important actions, but the keyboard remains the primary control surface.
 
@@ -18,6 +18,36 @@ KNIFE has three layers of interaction:
    - Help/input map, equation view, hidden/debug tools
 
 The app is designed so that rapid exploration can happen without leaving the keyboard, while mouse and touch users can still reach most major features.
+
+## Authoritative Input Map (Auto-Generated)
+
+<!-- AUTO-GEN:INPUT_MAP:START -->
+Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
+
+| Action | Keyboard | Mouse | Touch | Parity |
+| --- | --- | --- | --- | --- |
+| Pan View | Arrow keys (Shift/Ctrl/Cmd for finer steps) | Click + drag | Single-finger drag | full |
+| Zoom In / Out | =/- (Shift/Ctrl/Cmd for step size) | Wheel; click to zoom in; Shift+click to zoom out | Single tap to zoom in; two-finger tap to zoom out; pinch/stretch gesture; nav pad +/- | full |
+| Reset Ladder | r (recenter), Shift+r (recenter, default zoom), Alt/Option+r (recenter, default zoom, reset palette cycle state) | Reset button (base recenter only) | Reset button (base recenter only) | partial |
+| Palette Menu / Next Palette | p (open/cycle), Shift+p (close), 1-9 (quick pick) | Palette button + menu | Palette button + menu | full |
+| Fractal Menu / Quick Fractal | f (menu), Shift+1-9 (quick fractal) | Fractal button + menu | Fractal button + menu | full |
+| Detail / Speed Menus | d/s | Detail + Speed buttons | Detail + Speed buttons | full |
+| Iteration Lock Override | l (when fractal has fixed iterations) | Detail panel -> Override fractal lock checkbox | Detail panel -> Override fractal lock checkbox | full |
+| Colorizer Mode / Param | o (next mode), Shift+o (−param), Ctrl/Cmd+o (+param), Ctrl/Cmd+Shift+o (trap shape) | Palette panel -> Colorizer controls | Palette panel -> Colorizer controls | full |
+| Palette Cycling | x/c/v cluster: c (pause/resume), Shift+c (phase reset), v (faster), x (slower), paused x/v (phase nudge), Shift+x/Shift+v (coarse step), Ctrl/Cmd+x/Ctrl/Cmd+v (fine step), Ctrl/Cmd+Shift+x/Ctrl/Cmd+Shift+v (ultra-fine step) | Speed menu slider/presets; long-press Speed icon resets phase | Speed menu slider/presets; long-press Speed icon resets phase | full |
+| Info Overlay | i (toggle), Shift+i (reset panel position) | Info button | Info button | full |
+| Hi-Res Toggle | m | Monitor button | Monitor button | full |
+| Navigation Pad | n | Nav button (4-way icon); drag NAV badge to move panel | Nav button (4-way icon); drag NAV badge to move panel | full |
+| Header Compact Toggle | k | Click KNIFE stats header | Tap KNIFE stats header | full |
+| Header/UI Visibility | h (header-only mode toggle), Shift+h (hide all UI) | Long-press KNIFE header (controls -> hide all), long-press UI hotspot (restore all) | Long-press KNIFE header (controls -> hide all), long-press UI hotspot (restore all) | full |
+| Debug Console | Ctrl/Cmd+Shift+d (alias: Ctrl/Cmd+Shift+a) | N/A | N/A | gap |
+| Help Overlay | Shift+/ (?) | Info panel -> ? button | Info panel -> ? button | full |
+| Fractal Equation | e | Info panel -> View Equation | Info panel -> View Equation | full |
+
+**Parity Gaps**
+- Reset Ladder: Advanced reset tiers are keyboard-only.
+- Debug Console: Intentional goblin-mode keyboard access.
+<!-- AUTO-GEN:INPUT_MAP:END -->
 
 ## Core navigation
 
@@ -40,14 +70,15 @@ The app is designed so that rapid exploration can happen without leaving the key
   - click canvas to zoom in
   - `Shift+click` canvas to zoom out
 - Touch:
+  - single tap to zoom in
+  - two-finger tap to zoom out
   - pinch/spread gesture
   - nav pad `+` / `-` when enabled
 
 ### Reset and recenter
 - `r` = recenter
-- `Shift+r` = safe recenter
-- `Alt+r` / `Option+r` = safe preset reset
-- `Ctrl+Shift+r` / `Cmd+Shift+r` = hard reset
+- `Shift+r` = recenter + default zoom + default palette
+- `Alt+r` / `Option+r` = recenter + default zoom + reset palette cycle state
 - Mouse/touch button support exists for basic reset, but advanced reset tiers are keyboard-only
 
 ## Main panels
@@ -99,9 +130,15 @@ The info panel can also:
 - be reset by double-clicking its header
 
 ### Help overlay
-- `?` toggles the full help/input map
+- `Shift+/` (`?`) toggles the full help/input map
 
 This is the master control reference and explicitly shows keyboard, mouse, and touch parity for each action.
+
+### Debug console
+- `Ctrl+Shift+d` / `Cmd+Shift+d` toggles the debug console
+- Alias: `Ctrl+Shift+a` / `Cmd+Shift+a`
+
+This is intentionally keyboard-only.
 
 ### Equation view
 - `e` toggles the current fractal equation view
@@ -142,7 +179,10 @@ When cycling is paused:
 - `v` nudges phase forward
 - `x` nudges phase backward
 
-Modifiers on `x` and `v` change how large the speed steps are.
+Speed-step modifiers for `x` / `v`:
+- `Shift+x` / `Shift+v` = coarse steps
+- `Ctrl+x` / `Ctrl+v` and `Cmd+x` / `Cmd+v` = fine steps
+- `Ctrl+Shift+x` / `Ctrl+Shift+v` and `Cmd+Shift+x` / `Cmd+Shift+v` = ultra-fine steps
 
 The speed menu also provides visual controls, and long-pressing the speed icon resets the phase.
 
@@ -195,6 +235,9 @@ Features:
 
 This is one of the better bridges between exploratory use and precise repeatable navigation.
 
+Global note:
+- `Escape` also closes transient UI panels/overlays.
+
 ## Discovery notes for new users
 
 Most confusion for first-time users will come from these facts:
@@ -222,7 +265,7 @@ Just press ? for the full control map. KNIFE is optimized for keyboard-first exp
 ## An Example first-session
 1. Press `?`
 2. Pan with arrow keys or drag
-3. Zoom with `=` / `-` or wheel/pinch
+3. Zoom with `=` / `-` or wheel/tap
 4. Press `p` to try palettes
 5. Press `f` to switch fractals
 6. Press `i` to open the info panel
