@@ -42,11 +42,13 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 | Header/UI Visibility | h (header-only mode toggle), Shift+h (hide all UI) | Long-press KNIFE header (controls -> hide all), long-press UI hotspot (restore all) | Long-press KNIFE header (controls -> hide all), long-press UI hotspot (restore all) | full |
 | Debug Console | Ctrl/Cmd+Shift+d (alias: Ctrl/Cmd+Shift+a) | N/A | N/A | gap |
 | Help Overlay | Shift+/ (?) | Help (?) lane button; Info panel -> ? button | Help (?) lane button; Info panel -> ? button | full |
+| Design Mode (MVP) | g (toggle) | N/A | N/A | gap |
 | Fractal Equation | e | Info panel -> View Equation | Info panel -> View Equation | full |
 
 **Parity Gaps**
 - Reset Ladder: Advanced reset tiers are keyboard-only.
 - Debug Console: Intentional goblin-mode keyboard access.
+- Design Mode (MVP): Keyboard-only by design while the MVP interface is being iterated.
 <!-- AUTO-GEN:INPUT_MAP:END -->
 
 ## Core navigation
