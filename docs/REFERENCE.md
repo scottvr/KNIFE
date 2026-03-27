@@ -270,4 +270,4 @@ Just press ? for the full control map. KNIFE is optimized for keyboard-first exp
 
 ## Philosophy of use
 
-KNIFE is closer to an instrument, editor, or console-driven explorer than to a conventional touch-first gallery app. Users who understand that tend to learn it quickly. Users expecting a purely self-describing mobile UI may miss capabilities unless the app tells them, early and clearly, that `?` is the gateway to the control system.
+KNIFE is closer to an instrument, editor, or console-driven explorer than to a conventional touch-first gallery app. Users who understand that tend to learn it quickly. ? is the answer.
