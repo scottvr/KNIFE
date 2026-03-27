@@ -233,7 +233,7 @@ Features:
 - Enter applies
 - Escape cancels
 
-This is one of the better bridges between exploratory use and precise repeatable navigation.
+This is  ia rudmentary bridge between exploratory use and precise repeatable navigation.
 
 Global note:
 - `Escape` also closes transient UI panels/overlays.
@@ -247,16 +247,12 @@ Most confusion for first-time users will come from these facts:
 3. Some advanced reset and debug functions are intentionally keyboard-only.
 4. The app assumes that learning controls is part of using it.
 
-That is not a flaw by itself, but it does mean new-user documentation is important.
-
 ## Known parity gaps
 
 The app itself already identifies these:
 
 - Advanced reset tiers are keyboard-only
 - Debug console is keyboard-only by design
-
-That is actually a good sign: the app is self-aware about its parity story, and the help overlay documents it directly.
 
 ## Getting started
 
