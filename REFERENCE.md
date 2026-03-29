@@ -31,10 +31,12 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 | Reset Ladder | r (recenter), Shift+r (recenter, default zoom), Alt/Option+r (recenter, default zoom, reset palette cycle state) | Reset button (base recenter only) | Reset button (base recenter only) | partial |
 | Palette Menu / Next Palette | p (open/cycle), Shift+p (close), 1-9 (quick pick) | Palette button + menu | Palette button + menu | full |
 | Fractal Menu / Quick Fractal | f (menu), Shift+1-9 (quick fractal) | Fractal button + menu | Fractal button + menu | full |
+| Workspace Switch | Shift+w then workspace key (E=Explore, S=Science, Q=Equation, D=Design) | Workspace panel buttons | Workspace panel buttons | full |
 | Detail / Speed Menus | d/s | Detail + Speed buttons | Detail + Speed buttons | full |
 | Iteration Lock Override | l (when fractal has fixed iterations) | Detail panel -> Override fractal lock checkbox | Detail panel -> Override fractal lock checkbox | full |
 | Colorizer Mode / Param | o (next mode), Shift+o (−param), Ctrl/Cmd+o (+param), Ctrl/Cmd+Shift+o (trap shape) | Palette panel -> Colorizer controls | Palette panel -> Colorizer controls | full |
 | Palette Cycling | x/c/v cluster: c (pause/resume), Shift+c (phase reset), v (faster), x (slower), paused x/v (phase nudge), Shift+x/Shift+v (coarse step), Ctrl/Cmd+x/Ctrl/Cmd+v (fine step), Ctrl/Cmd+Shift+x/Ctrl/Cmd+Shift+v (ultra-fine step) | Speed menu slider/presets; long-press Speed icon resets phase | Speed menu slider/presets; long-press Speed icon resets phase | full |
+| Coordinates Overlay | u (toggle), Shift+u (reset panel position) | Coordinates button | Coordinates button | full |
 | Info Overlay | i (toggle), Shift+i (reset panel position) | Info button | Info button | full |
 | Hi-Res Toggle | m | Monitor button | Monitor button | full |
 | Navigation Pad | n | Nav button (4-way icon); drag NAV badge to move panel | Nav button (4-way icon); drag NAV badge to move panel | full |
@@ -42,13 +44,13 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 | Header/UI Visibility | h (header-only mode toggle), Shift+h (hide all UI) | Long-press KNIFE header (controls -> hide all), long-press UI hotspot (restore all) | Long-press KNIFE header (controls -> hide all), long-press UI hotspot (restore all) | full |
 | Debug Console | Ctrl/Cmd+Shift+d (alias: Ctrl/Cmd+Shift+a) | N/A | N/A | gap |
 | Help Overlay | Shift+/ (?) | Help (?) lane button; Info panel -> ? button | Help (?) lane button; Info panel -> ? button | full |
-| Design Mode (MVP) | g (toggle) | N/A | N/A | gap |
-| Fractal Equation | e | Info panel -> View Equation | Info panel -> View Equation | full |
+| Design Mode (MVP) | g (toggle) | Equation panel -> Sigma button | Equation panel -> Sigma button | partial |
+| Fractal Equation | e | Context panel -> Peek | Context panel -> Peek | full |
 
 **Parity Gaps**
 - Reset Ladder: Advanced reset tiers are keyboard-only.
 - Debug Console: Intentional goblin-mode keyboard access.
-- Design Mode (MVP): Keyboard-only by design while the MVP interface is being iterated.
+- Design Mode (MVP): Pointer/touch path is available from the equation panel once opened.
 <!-- AUTO-GEN:INPUT_MAP:END -->
 
 ## Core navigation
