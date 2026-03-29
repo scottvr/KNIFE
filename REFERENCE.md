@@ -45,6 +45,7 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 | Debug Console | Ctrl/Cmd+Shift+d (alias: Ctrl/Cmd+Shift+a) | N/A | N/A | gap |
 | Help Overlay | Shift+/ (?) | Help (?) lane button; Info panel -> ? button | Help (?) lane button; Info panel -> ? button | full |
 | Design Mode (MVP) | g (toggle) | Equation panel -> Sigma button | Equation panel -> Sigma button | partial |
+| Palette Studio | y (toggle) | Palette menu -> Open Palette Studio | Palette menu -> Open Palette Studio | full |
 | Fractal Equation | e | Context panel -> Peek | Context panel -> Peek | full |
 
 **Parity Gaps**
