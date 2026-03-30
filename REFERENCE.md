@@ -42,7 +42,7 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 | Navigation Pad | n | Nav button (4-way icon); drag NAV badge to move panel | Nav button (4-way icon); drag NAV badge to move panel | full |
 | Header Compact Toggle | k | Click KNIFE stats header | Tap KNIFE stats header | full |
 | Header/UI Visibility | h (header-only mode toggle), Shift+h (hide all UI) | Long-press KNIFE header (controls -> hide all), long-press UI hotspot (restore all) | Long-press KNIFE header (controls -> hide all), long-press UI hotspot (restore all) | full |
-| Debug Console | Ctrl/Cmd+Shift+d (alias: Ctrl/Cmd+Shift+a), / (open collapsed command lane) | N/A | N/A | gap |
+| Debug Console | Ctrl/Cmd+Shift+d (alias: Ctrl/Cmd+Shift+a), / (focus debug command input) | N/A | N/A | gap |
 | Help Overlay | Shift+/ (?) | Help (?) lane button; Info panel -> ? button | Help (?) lane button; Info panel -> ? button | full |
 | Design Mode (MVP) | g (toggle) | Equation panel -> Sigma button | Equation panel -> Sigma button | partial |
 | Palette Studio | y (toggle) | Palette menu -> Open Palette Studio | Palette menu -> Open Palette Studio | full |
