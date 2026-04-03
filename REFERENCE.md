@@ -36,6 +36,7 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 | Iteration Lock Override | l (when fractal has fixed iterations) | Detail panel -> Override fractal lock checkbox | Detail panel -> Override fractal lock checkbox | full |
 | Colorizer Mode / Param | o (next mode), Shift+o (−param), Ctrl/Cmd+o (+param), Ctrl/Cmd+Shift+o (trap shape) | Palette panel -> Colorizer controls | Palette panel -> Colorizer controls | full |
 | Palette Cycling | x/c/v cluster: c (pause/resume), Shift+c (phase reset), v (faster), x (slower), paused x/v (phase nudge), Shift+x/Shift+v (coarse step), Ctrl/Cmd+x/Ctrl/Cmd+v (fine step), Ctrl/Cmd+Shift+x/Ctrl/Cmd+Shift+v (ultra-fine step) | Speed menu slider/presets; long-press Speed icon resets phase | Speed menu slider/presets; long-press Speed icon resets phase | full |
+| Scene Motion Pause/Resume | Space (pause/resume scene motion) | Scene Control menu -> Freeze Motion toggle | Scene Control menu -> Freeze Motion toggle | full |
 | Coordinates Overlay | u (toggle), Shift+u (reset panel position) | Coordinates button | Coordinates button | full |
 | Info Overlay | i (toggle), Shift+i (reset panel position) | Info button | Info button | full |
 | Hi-Res Toggle | m | Monitor button | Monitor button | full |
