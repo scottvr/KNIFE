@@ -31,7 +31,7 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 | Reset Ladder | r (recenter), Shift+r (recenter, default zoom), Alt/Option+r (recenter, default zoom, reset palette cycle state) | Reset button (base recenter only) | Reset button (base recenter only) | partial |
 | Palette Menu / Next Palette | p (open/cycle), Shift+p (close), 1-9 (quick pick) | Palette button + menu | Palette button + menu | full |
 | Fractal Menu / Quick Fractal | f (menu), Shift+1-9 (quick fractal) | Fractal button + menu | Fractal button + menu | full |
-| Workspace Switch | Shift+w then workspace key (E=Explore, S=Science, Q=Equation, D=Design) | Workspace panel buttons | Workspace panel buttons | full |
+| Workspace Switch | Shift+w then workspace key (E=Explore, Q=Equation, D=Design) | Workspace panel buttons | Workspace panel buttons | full |
 | Detail / Speed Menus | d/s | Detail + Speed buttons | Detail + Speed buttons | full |
 | Iteration Lock Override | l (when fractal has fixed iterations) | Detail panel -> Override fractal lock checkbox | Detail panel -> Override fractal lock checkbox | full |
 | Colorizer Mode / Param | o (next mode), Shift+o (−param), Ctrl/Cmd+o (+param), Ctrl/Cmd+Shift+o (trap shape) | Palette panel -> Colorizer controls | Palette panel -> Colorizer controls | full |
