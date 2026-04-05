@@ -1,0 +1,13 @@
+# .gitignore for main branch
+src/
+src/**/*
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+*.json
+*.ts
