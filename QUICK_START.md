@@ -2,6 +2,10 @@
 
 KNIFE is a keyboard-first fractal explorer. You can use mouse and touch too, but the fastest way to navigate is with the keyboard.
 
+Need full depth after this card?
+- [Open the full Pilot Manual](MANUAL.md)
+- [Open the exact binding matrix](REFERENCE.md)
+
 ## Start here
 
 - Press `?` to open the full input map and control reference.
