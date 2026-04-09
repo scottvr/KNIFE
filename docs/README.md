@@ -66,7 +66,11 @@ https://blehg.paperclipmaximizer.ai/KNIFE/
 [A Quick Start Guide](QUICK_START.md) is available, but the "quickest" way to start is to just jump in. Look at the screen, and press the `?` key.
 This will tell you how to do everything else. But, if you feel lost because you expect drop down menus with words and such on them, try reading the Quisckstart first.
 
-For those that find it easy to navigate your way around the app, you might be interested in learning about [more advanced topics](REFERENCE.md), but again - you can just explore by clikcing things and pressing keys; you will learn quicklly that way. 
+For those that find it easy to navigate your way around the app, you might be interested in learning about [more advanced topics](REFERENCE.md), but again - you can just explore by clikcing things and pressing keys; you will learn quicklly that way.
+
+If you want the full boxed-manual treatment, start here:
+
+- [KNIFE Pilot Manual](MANUAL.md)
 
 ## Updates, now in 3D!
 
@@ -91,7 +95,6 @@ https://github.com/user-attachments/assets/993ecf0d-662a-42ba-8063-c539112ddb5b
 This is a work in progress I've been trying to make a chrome bulb. This is the best so far, and it kinda looks like titanium with diamonds or soemething, but it almost works
 
 https://github.com/user-attachments/assets/56dffe44-df18-43a0-831f-97d416ade7d4
-
 
 
 

@@ -26,27 +26,34 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 
 | Action | Keyboard | Mouse | Touch | Parity |
 | --- | --- | --- | --- | --- |
-| Pan View | Arrow keys (Shift/Ctrl/Cmd for finer steps) | Click + drag | Single-finger drag | full |
-| Zoom In / Out | =/- (Shift/Ctrl/Cmd for step size) | Wheel; click to zoom in; Shift+click to zoom out | Single tap to zoom in; two-finger tap to zoom out; pinch/stretch gesture; nav pad +/- | full |
+| Pan View | Arrow keys (2D pan; 3D object translate when focused, otherwise scene pan; Ctrl/Cmd = camera orbit; Shift/Ctrl/Cmd = finer steps) | 2D: click + drag pan. 3D: drag on object rotates object, drag off-object pans scene, Ctrl/Cmd + drag orbits camera | 2D: single-finger drag pan. 3D: drag on object rotates object, drag off-object pans scene (camera orbit via nav pad Camera Orbit mode) | full |
+| Object Focus Selection (Volumetric) | Arrow/navpad actions apply to the active object target | Click object projection to set active control target | Tap object projection to set active control target | full |
+| Zoom In / Out | =/- (2D zoom in/out; 3D Shift = dolly, Ctrl/Cmd = focal length/FoV) | Wheel; click to zoom in; Shift+click to zoom out | Single tap to zoom in; two-finger tap to zoom out; pinch/stretch gesture; nav pad +/- (Camera Orbit mode: +/- dolly) | full |
 | Reset Ladder | r (recenter), Shift+r (recenter, default zoom), Alt/Option+r (recenter, default zoom, reset palette cycle state) | Reset button (base recenter only) | Reset button (base recenter only) | partial |
 | Palette Menu / Next Palette | p (open/cycle), Shift+p (close), 1-9 (quick pick) | Palette button + menu | Palette button + menu | full |
 | Fractal Menu / Quick Fractal | f (menu), Shift+1-9 (quick fractal) | Fractal button + menu | Fractal button + menu | full |
+| Workspace Switch | Shift+w then workspace key (E=Explore, Q=Equation, D=Design, V=Volumetric) | Workspace panel buttons | Workspace panel buttons | full |
 | Detail / Speed Menus | d/s | Detail + Speed buttons | Detail + Speed buttons | full |
 | Iteration Lock Override | l (when fractal has fixed iterations) | Detail panel -> Override fractal lock checkbox | Detail panel -> Override fractal lock checkbox | full |
 | Colorizer Mode / Param | o (next mode), Shift+o (−param), Ctrl/Cmd+o (+param), Ctrl/Cmd+Shift+o (trap shape) | Palette panel -> Colorizer controls | Palette panel -> Colorizer controls | full |
 | Palette Cycling | x/c/v cluster: c (pause/resume), Shift+c (phase reset), v (faster), x (slower), paused x/v (phase nudge), Shift+x/Shift+v (coarse step), Ctrl/Cmd+x/Ctrl/Cmd+v (fine step), Ctrl/Cmd+Shift+x/Ctrl/Cmd+Shift+v (ultra-fine step) | Speed menu slider/presets; long-press Speed icon resets phase | Speed menu slider/presets; long-press Speed icon resets phase | full |
+| Scene Motion Pause/Resume | Space (pause/resume scene motion) | Scene Control menu -> Freeze Motion toggle | Scene Control menu -> Freeze Motion toggle | full |
+| Coordinates Overlay | u (toggle), Shift+u (reset panel position) | Coordinates button | Coordinates button | full |
 | Info Overlay | i (toggle), Shift+i (reset panel position) | Info button | Info button | full |
 | Hi-Res Toggle | m | Monitor button | Monitor button | full |
-| Navigation Pad | n | Nav button (4-way icon); drag NAV badge to move panel | Nav button (4-way icon); drag NAV badge to move panel | full |
+| Navigation Pad | n | Nav button (4-way icon); drag NAV badge to move panel | Nav button (4-way icon); Camera Orbit toggle maps arrows to camera orbit and +/- to dolly in volumetric | full |
 | Header Compact Toggle | k | Click KNIFE stats header | Tap KNIFE stats header | full |
 | Header/UI Visibility | h (header-only mode toggle), Shift+h (hide all UI) | Long-press KNIFE header (controls -> hide all), long-press UI hotspot (restore all) | Long-press KNIFE header (controls -> hide all), long-press UI hotspot (restore all) | full |
-| Debug Console | Ctrl/Cmd+Shift+d (alias: Ctrl/Cmd+Shift+a) | N/A | N/A | gap |
-| Help Overlay | Shift+/ (?) | Info panel -> ? button | Info panel -> ? button | full |
-| Fractal Equation | e | Info panel -> View Equation | Info panel -> View Equation | full |
+| Debug Console | Ctrl/Cmd+Shift+d (alias: Ctrl/Cmd+Shift+a), / (focus debug command input) | N/A | N/A | gap |
+| Help Overlay | Shift+/ (?) | Help (?) lane button; Info panel -> ? button | Help (?) lane button; Info panel -> ? button | full |
+| Design Mode (MVP) | g (toggle) | Equation panel -> Sigma button | Equation panel -> Sigma button | partial |
+| Palette Studio | y (toggle) | Palette menu -> Open Palette Studio | Palette menu -> Open Palette Studio | full |
+| Fractal Equation | e | Context panel -> Peek | Context panel -> Peek | full |
 
 **Parity Gaps**
 - Reset Ladder: Advanced reset tiers are keyboard-only.
 - Debug Console: Intentional goblin-mode keyboard access.
+- Design Mode (MVP): Pointer/touch path is available from the equation panel once opened.
 <!-- AUTO-GEN:INPUT_MAP:END -->
 
 ## Core navigation
