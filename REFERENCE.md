@@ -26,8 +26,9 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 
 | Action | Keyboard | Mouse | Touch | Parity |
 | --- | --- | --- | --- | --- |
-| Pan View | Arrow keys (Shift/Ctrl/Cmd for finer steps) | Click + drag | Single-finger drag | full |
-| Zoom In / Out | =/- (Shift/Ctrl/Cmd for step size) | Wheel; click to zoom in; Shift+click to zoom out | Single tap to zoom in; two-finger tap to zoom out; pinch/stretch gesture; nav pad +/- | full |
+| Pan View | Arrow keys (2D pan; 3D object translate when focused, otherwise scene pan; Ctrl/Cmd = camera orbit; Shift/Ctrl/Cmd = finer steps) | 2D: click + drag pan. 3D: drag on object rotates object, drag off-object pans scene, Ctrl/Cmd + drag orbits camera | 2D: single-finger drag pan. 3D: drag on object rotates object, drag off-object pans scene (camera orbit via nav pad Camera Orbit mode) | full |
+| Object Focus Selection (Volumetric) | Arrow/navpad actions apply to the active object target | Click object projection to set active control target | Tap object projection to set active control target | full |
+| Zoom In / Out | =/- (2D zoom in/out; 3D Shift = dolly, Ctrl/Cmd = focal length/FoV) | Wheel; click to zoom in; Shift+click to zoom out | Single tap to zoom in; two-finger tap to zoom out; pinch/stretch gesture; nav pad +/- (Camera Orbit mode: +/- dolly) | full |
 | Reset Ladder | r (recenter), Shift+r (recenter, default zoom), Alt/Option+r (recenter, default zoom, reset palette cycle state) | Reset button (base recenter only) | Reset button (base recenter only) | partial |
 | Palette Menu / Next Palette | p (open/cycle), Shift+p (close), 1-9 (quick pick) | Palette button + menu | Palette button + menu | full |
 | Fractal Menu / Quick Fractal | f (menu), Shift+1-9 (quick fractal) | Fractal button + menu | Fractal button + menu | full |
@@ -40,7 +41,7 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 | Coordinates Overlay | u (toggle), Shift+u (reset panel position) | Coordinates button | Coordinates button | full |
 | Info Overlay | i (toggle), Shift+i (reset panel position) | Info button | Info button | full |
 | Hi-Res Toggle | m | Monitor button | Monitor button | full |
-| Navigation Pad | n | Nav button (4-way icon); drag NAV badge to move panel | Nav button (4-way icon); drag NAV badge to move panel | full |
+| Navigation Pad | n | Nav button (4-way icon); drag NAV badge to move panel | Nav button (4-way icon); Camera Orbit toggle maps arrows to camera orbit and +/- to dolly in volumetric | full |
 | Header Compact Toggle | k | Click KNIFE stats header | Tap KNIFE stats header | full |
 | Header/UI Visibility | h (header-only mode toggle), Shift+h (hide all UI) | Long-press KNIFE header (controls -> hide all), long-press UI hotspot (restore all) | Long-press KNIFE header (controls -> hide all), long-press UI hotspot (restore all) | full |
 | Debug Console | Ctrl/Cmd+Shift+d (alias: Ctrl/Cmd+Shift+a), / (focus debug command input) | N/A | N/A | gap |

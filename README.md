@@ -68,5 +68,30 @@ This will tell you how to do everything else. But, if you feel lost because you 
 
 For those that find it easy to navigate your way around the app, you might be interested in learning about [more advanced topics](REFERENCE.md), but again - you can just explore by clikcing things and pressing keys; you will learn quicklly that way. 
 
+## Updates, now in 3D!
+
+When I learned of the Mandelbulb, I knew we needed to support 3D fractals. It's taken a lot of time to get it to a state near all of the beautiful images I saw online, and it was getting rather disappointing that my prototype, even borrowing from lots of folks examples at shadertoy.com, just didn't look as nice. I had to rewire quite a bit of the UI, which had evolved organically from just supporting the 2D Mandelbrot, and broke from the keyboard-first approach a bit until I got it usable, then retrofitted keyboard controls. I also added the concept of "workspaces" to try to reign in the control clutter that followed from adding instrumentation for debugging and performance metrics in the process. This grew to a sort of bespoke window manager with virtual desktops, which still needs a good deal of work so is not really documented and mostly-hidden by default. (`shift+w` then `v` will get you to the `Volumetric` workspace, where the Mandelbulb is currently sequestered if you want to experiment with it. 
+
+Here's some of the best bulbs (but not the best images; taken on my phone and re-compressed for file size (they're 10% of the size the were captured by my phone! sorry. It's' not really so pixelated.) of KNIFE's rendition of the mandelbulb:
+
+
+The bioluminescent bulb:
+
+https://github.com/user-attachments/assets/d0772250-2d6c-4613-a129-e9ac1c674b59
+
+I was very excited to finally have lighting working properly. (It would follow the bulb's rotation in geosynchronous orbit for the first several attempts) so I added colored lights and a bit of fog between the bulb and the light source.
+
+https://github.com/user-attachments/assets/13d70ec5-dddd-49ea-af2f-1d077cb62d8f
+
+This one contains a blazing inferno
+
+https://github.com/user-attachments/assets/993ecf0d-662a-42ba-8063-c539112ddb5b
+
+
+This is a work in progress I've been trying to make a chrome bulb. This is the best so far, and it kinda looks like titanium with diamonds or soemething, but it almost works
+
+https://github.com/user-attachments/assets/56dffe44-df18-43a0-831f-97d416ade7d4
+
+
 
 
