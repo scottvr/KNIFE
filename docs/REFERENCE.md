@@ -27,9 +27,10 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 | Action | Keyboard | Mouse | Touch | Parity |
 | --- | --- | --- | --- | --- |
 | Pan View | Arrow keys (2D pan; 3D object translate when focused, otherwise scene pan; Ctrl/Cmd = camera orbit; Shift/Ctrl/Cmd = finer steps) | 2D: click + drag pan. 3D: drag on object rotates object, drag off-object pans scene, Ctrl/Cmd + drag orbits camera | 2D: single-finger drag pan. 3D: drag on object rotates object, drag off-object pans scene (camera orbit via nav pad Camera Orbit mode) | full |
-| Object Focus Selection (Volumetric) | Arrow/navpad actions apply to the active object target | Click object projection to set active control target | Tap object projection to set active control target | full |
+| Object Focus Selection (Volumetric) | Arrow/navpad actions apply to selected object target(s) | Shift+click object = select/focus, Shift+click another = additive select, double-click object = single-select + focus, click empty space = clear selection | Tap object projection = single-select + focus; tap empty space clears selection | full |
 | Zoom In / Out | =/- (2D zoom in/out; 3D Shift = dolly, Ctrl/Cmd = focal length/FoV) | Wheel; click to zoom in; Shift+click to zoom out | Single tap to zoom in; two-finger tap to zoom out; pinch/stretch gesture; nav pad +/- (Camera Orbit mode: +/- dolly) | full |
 | Reset Ladder | r (recenter), Shift+r (recenter, default zoom), Alt/Option+r (recenter, default zoom, reset palette cycle state) | Reset button (base recenter only) | Reset button (base recenter only) | partial |
+| Undo Last Volumetric Action | Ctrl/Cmd+z (undo last committed volumetric action; one-step depth) | N/A | N/A | gap |
 | Palette Menu / Next Palette | p (open/cycle), Shift+p (close), 1-9 (quick pick) | Palette button + menu | Palette button + menu | full |
 | Fractal Menu / Quick Fractal | f (menu), Shift+1-9 (quick fractal) | Fractal button + menu | Fractal button + menu | full |
 | Workspace Switch | Shift+w then workspace key (E=Explore, Q=Equation, D=Design, V=Volumetric) | Workspace panel buttons | Workspace panel buttons | full |
@@ -52,6 +53,7 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 
 **Parity Gaps**
 - Reset Ladder: Advanced reset tiers are keyboard-only.
+- Undo Last Volumetric Action: Volumetric workspace only; one-step undo depth.
 - Debug Console: Intentional goblin-mode keyboard access.
 - Design Mode (MVP): Pointer/touch path is available from the equation panel once opened.
 <!-- AUTO-GEN:INPUT_MAP:END -->
