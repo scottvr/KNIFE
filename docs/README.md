@@ -31,11 +31,6 @@ Or this:
 
 
 
-https://github.com/user-attachments/assets/d146274c-170c-4dbf-90ba-9853522fc3f1
-
-
-
-Or maybe this. (I don't actually know which video's I'm uploading; I'm just clicking and dragging willy-nilly here.)
 
 https://github.com/user-attachments/assets/7345c907-b3b4-42af-a8b5-1cfcd4a42e88
 
