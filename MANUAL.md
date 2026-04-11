@@ -111,11 +111,12 @@ These are the controls most users rely on every session:
 
 ### 6.1 Navigation and reset
 
-- Pan: arrow keys
+- Pan: arrow keys (alt pan keys: `[` `]` `,` `.`)
 - Zoom in/out: `=` / `-`
 - Recenter: `r`
 - Reset view defaults: `Shift+r`
-- Safety preset reset: `Alt/Option+r` (includes cycle state reset)
+- Safety preset reset: `Alt/Option+r` (includes cycle state reset; Volumetric also restores object home pose)
+- Undo last volumetric action: `Ctrl/Cmd+z` (Volumetric workspace, one-step depth)
 
 ### 6.2 Menus and overlays
 
@@ -151,8 +152,16 @@ This section is the heart of 3D operation.
 ### 7.2 Object focus selection
 
 Before translating with keys/nav pad, set focus:
-- click/tap object projection to make it the active target
+- `Shift+click` object projection to select and focus that object
+- keep `Shift` held and click another object to add it to the selection set
+- double-click object projection to single-select and focus
+- tap object projection to single-select and focus (touch)
+- click/tap empty scene space to clear object selection
 - or use the Object Selector Dock to choose Camera, Tank, or instance directly
+
+Selection click behavior in Volumetric:
+- plain single click remains click-zoom behavior
+- selection uses `Shift+click` or double-click so it does not compete with click-zoom
 
 If no object is focused, movement actions may pan/orbit scene framing instead of moving an object.
 
@@ -276,7 +285,7 @@ Use this in order from least to most disruptive:
    Reset view to fractal defaults (center + zoom + initial palette).
 
 3. `Alt/Option+r`  
-   Safety preset reset: returns to home view and resets cycle state.
+   Safety preset reset: returns to home view, resets cycle state, and in Volumetric restores object transforms to home pose.
 
 Volumetric note:
 - all three reset paths also clear scene camera input offsets used for orbit/pan stabilization.
