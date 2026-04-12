@@ -107,7 +107,7 @@ https://github.com/user-attachments/assets/9ef1342b-e3f5-42cb-b87d-cebc22fa37bc
 
 Since I created those first images of the "bioluminescent bulbfish" in the traditional `power 8` shape of the Mandelbulb, I had a need to find a way to make even more "deep-sea fractals". This was before KNIFE had the ability to tweak the formula so extensively and easily so I wasn't quite sure *how* I was going to to it, aside from more GPU shader techniques (as with the "bioluminescent" and "infero" fractals seen earlier on this page) so I thought that one way to do this was by putting them in an aquarium, naturally. (I have since added configurable "murk" and "haze" to the water, refraction to its enclosing glass, better movement, save/add/remove individual bulbs, drop them in the tank, and so on) but the feature is not exposed on a menu because the controls are still a bit awkward even for just manipulating a single bulb in the center of view. Soon, though.)
 
-Anyway, here's a couple videos of the aforementioned 3D fractals from the earlier 3D updates; Bulbfish in their prototype tank:
+Anyway, here's a couple videos of the aforementioned 3D fractals from the earlier 3D updates (ok, the bioluminescent one is a new stage of his lifecycle so he's shaped a little differently now; **Bulbfish in their prototype tank:**
 
 
 https://github.com/user-attachments/assets/46f995da-a030-4220-b148-d935c1d37f0d
@@ -115,8 +115,5 @@ https://github.com/user-attachments/assets/46f995da-a030-4220-b148-d935c1d37f0d
 
 
 https://github.com/user-attachments/assets/f711a095-2734-41b9-a895-3d1243539094
-
-
-
 
 
