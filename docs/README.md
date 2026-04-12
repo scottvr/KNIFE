@@ -65,7 +65,11 @@ Here's some of the best bulbs (but not the best images; taken on my phone and re
 
 https://github.com/user-attachments/assets/d1520fad-3404-4cc8-ba6d-b54afde2ba51
 
-I was very excited to finally have lighting working properly. (It would follow the bulb's rotation in geosynchronous orbit for the first several attempts) so once it was an actual working lightsource, I added colored lights and a bit of fog between the bulb and the light:
+## Colored lights can hypnotize:
+
+I was very excited to finally have lighting working properly. (It would follow the bulb's rotation in geosynchronous orbit for the first several attempts) so once it was an actual working lightsource, I added colored lights and a bit of fog between the bulb and the light
+
+### (sparkle someone else's eyes)
 
 https://github.com/user-attachments/assets/d85d88c2-3014-4f8c-8ac9-77a4f3ef4494
 
