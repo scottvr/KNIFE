@@ -90,8 +90,7 @@ This Mandelbulb contains a blazing inferno:
 
 https://github.com/user-attachments/assets/ef3d0ed7-f6d9-45f2-a788-e4f6d29c6eab
 
-This is a work in progress I've been trying to make a chrome bulb. This is the best so far, and it kinda looks like titanium with diamonds or soemething, but it almost works
-
+This is a work in progress I've been trying to make a chrome bulb. This is the best so far, and it kinda looks like platinum with diamonds or something, but it almost works
 
 
 https://github.com/user-attachments/assets/08711f64-be92-4ffb-8d4c-171790638063
