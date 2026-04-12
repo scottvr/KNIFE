@@ -116,6 +116,7 @@ These are the controls most users rely on every session:
 - Recenter: `r`
 - Reset view defaults: `Shift+r`
 - Safety preset reset: `Alt/Option+r` (includes cycle state reset; Volumetric also restores object home pose)
+- Volumetric emergency object locate: `j` (quick camera jump to selected/off-screen object)
 - Undo last volumetric action: `Ctrl/Cmd+z` (Volumetric workspace, one-step depth)
 
 ### 6.2 Menus and overlays
@@ -281,10 +282,13 @@ Use this in order from least to most disruptive:
 1. `r`  
    Recenter framing while preserving current zoom profile.
 
-2. `Shift+r`  
+2. `j` (Volumetric only)  
+   Emergency find: camera jumps to birds-eye, tracks to the selected or off-screen object, then settles back into normal view facing it.
+
+3. `Shift+r`  
    Reset view to fractal defaults (center + zoom + initial palette).
 
-3. `Alt/Option+r`  
+4. `Alt/Option+r`  
    Safety preset reset: returns to home view, resets cycle state, and in Volumetric restores object transforms to home pose.
 
 Volumetric note:

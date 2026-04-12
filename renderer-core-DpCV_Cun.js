@@ -1,4 +1,4 @@
-import{r as m}from"./vendor-react-C9BmP58X.js";const wn={name:"Abyss",formula:`
+import{r as m}from"./vendor-react-DXoTT26f.js";const wn={name:"Abyss",formula:`
     float p = t * 6.28318 + cycle * 0.8;
     float glow = pow(0.5 + 0.5 * sin(p + 1.1), 3.0);
     return vec3(

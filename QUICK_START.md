@@ -48,6 +48,7 @@ Need full depth after this card?
 - `o` = switch colorizer mode
 - `m` = toggle hi-res rendering
 - `i` = toggle info panel
+- `j` = volumetric emergency "find object" camera jump
 - `?` = open help/input map
 
 ## If the screen feels too busy or too sparse
