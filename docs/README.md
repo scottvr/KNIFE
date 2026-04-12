@@ -19,7 +19,7 @@ And that it only takes a moment of self-guided exploration to figure out how to 
 
 <img width="1406" height="648" alt="KNIFE-2" src="https://github.com/user-attachments/assets/f01b5133-1b38-44a0-950e-12b2c63db9e2" />
 
-And then, maybe a few more clicks or taps or somesuch amd you've got it doing this:
+And then, maybe a few more clicks or taps or somesuch and you've got it doing this:
 
 
 https://github.com/user-attachments/assets/7345c907-b3b4-42af-a8b5-1cfcd4a42e88
