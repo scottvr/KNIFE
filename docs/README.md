@@ -95,6 +95,42 @@ This is a work in progress I've been trying to make a chrome bulb. This is the b
 
 https://github.com/user-attachments/assets/08711f64-be92-4ffb-8d4c-171790638063
 
+### latest
+
+These are pretty low-quality, both in compression and the fact that I was pointing the phone at a laptop to take them (it's an x86-era macbook air; it doesn't handle realtime WebGL and videocapture simultaneously very well) but I wanted to show a couple of things. 
+- This was when I added the ability to adjust the exponent from the standard (z^8 + x) to a range of -20 to +20 which can results in interesting variations on the shape, especially (to me) at lower powers, particularly fractional ones.
+- Further I have tweaked it by replacing the trig functions used to convert between spherical and cartesian coordinates in ways I have little undertanding of what or why it is actually doing what it does (in fact I've even added a `randomize` button to choose, well, _random_ tweaks to the algorithm by swapping in and out different trigonometric functions, axes and exponents, because YOLO!) but to me the results are fascinating, and I spend far too much time watching 3D fractals animate these days. As such,  I am always adding new features out of curiosity and joy it brings me.
+
+So the first thing I'll show cuz it's a little better quality than the video, is the first image I got where I felt like it truly resembled a figure completely made of a smooth, shiny metallic surface. (It is also blue, because since I was a kid, I've loved that polished blue metallic look, which may distract from the metallic intent I guess.)
+
+![decent_chrome-look](https://github.com/user-attachments/assets/37f40f95-74cb-44a6-99f8-d54ff6901feb)
+
+A short while later, I had a better "chrome" appearance, with the introduction of some environmental-ish look (I don't have reflective solid surface textures in the environment, so this was done with a slightly contrived palette and intense colored lighting at angles I arrived at by just trying different locations in 3D space until it looked pretty good, even if it's a bit unnatural wrt "sky" and "earth shades coming from the proper directions. It's not enough to feel uncanny to me. I don't recall with the power was set to for this one, and I was just starting to experiemtn with raising the bailout factor when tweaking the formula. Increasing the raymarcher's epsilon is also useful for "soothing" out a surface that you want to appear "shiny". (This was I think the biggest issue with my first attempt from above where it looked *reflective* in some way (like small single-cut diamonds to me) but didn't really screm "chrome!"):
+
+
+https://github.com/user-attachments/assets/09c17e3e-326c-49cc-9509-1db030738a08
+
+
+So here's some video that shows a much better result from my "chrome" experiments, as well as a demonstration of the aforementioned random combinations of trig functions to find an interesting shape, then of lowering and raising the exponent in real-time, which gives some pretty neat effect as it "unfurls" and "recoils" itself in the process of exposing more "bulbs" (which have been flatted here by the short raymarching length and high epsilon):
+
+
+
+https://github.com/user-attachments/assets/9ef1342b-e3f5-42cb-b87d-cebc22fa37bc
+
+
+### And last but not least: The Fractal Fishtank!
+
+Since I created those first images of the "bioluminescent bulbfish" in the traditional `power 8` shape of the Mandelbulb, I had a need to find a way to make even more "deep-sea fractals". This was before KNIFE had the ability to tweak the formula so extensively and easily so I wasn't quite sure *how* I was going to to it, aside from more GPU shader techniques (as with the "bioluminescent" and "infero" fractals seen earlier on this page) so I thought that one way to do this was by putting them in an aquarium, naturally. (I have since added configurable "murk" and "haze" to the water, refraction to its enclosing glass, better movement, save/add/remove individual bulbs, drop them in the tank, and so on) but the feature is not exposed on a menu because the controls are still a bit awkward even for just manipulating a single bulb in the center of view. Soon, though.)
+
+Anyway, here's a couple videos of the aforementioned 3D fractals from the earlier videos; Bulbfish in their prototype tank:
+
+
+
+https://github.com/user-attachments/assets/46f995da-a030-4220-b148-d935c1d37f0d
+
+
+
+https://github.com/user-attachments/assets/e4f33359-aebe-40a5-8ff0-78acb3fa61b3
 
 
 
