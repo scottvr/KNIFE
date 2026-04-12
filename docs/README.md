@@ -74,20 +74,28 @@ Here's some of the best bulbs (but not the best images; taken on my phone and re
 
 The bioluminescent bulb:
 
-https://github.com/user-attachments/assets/d0772250-2d6c-4613-a129-e9ac1c674b59
 
-I was very excited to finally have lighting working properly. (It would follow the bulb's rotation in geosynchronous orbit for the first several attempts) so I added colored lights and a bit of fog between the bulb and the light source.
 
-https://github.com/user-attachments/assets/13d70ec5-dddd-49ea-af2f-1d077cb62d8f
+https://github.com/user-attachments/assets/d1520fad-3404-4cc8-ba6d-b54afde2ba51
 
-This one contains a blazing inferno
 
-https://github.com/user-attachments/assets/993ecf0d-662a-42ba-8063-c539112ddb5b
 
+I was very excited to finally have lighting working properly. (It would follow the bulb's rotation in geosynchronous orbit for the first several attempts) so once it was an actual working lightsource, I added colored lights and a bit of fog between the bulb and the light:
+
+
+https://github.com/user-attachments/assets/d85d88c2-3014-4f8c-8ac9-77a4f3ef4494
+
+
+This Mandelbulb contains a blazing inferno:
+
+https://github.com/user-attachments/assets/ef3d0ed7-f6d9-45f2-a788-e4f6d29c6eab
 
 This is a work in progress I've been trying to make a chrome bulb. This is the best so far, and it kinda looks like titanium with diamonds or soemething, but it almost works
 
-https://github.com/user-attachments/assets/56dffe44-df18-43a0-831f-97d416ade7d4
+
+
+https://github.com/user-attachments/assets/08711f64-be92-4ffb-8d4c-171790638063
+
 
 
 
