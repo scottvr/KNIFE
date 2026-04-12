@@ -25,8 +25,6 @@ And then, maybe a few more clicks or taps or somesuch amd you've got it doing th
 
 https://github.com/user-attachments/assets/35a32122-0923-4736-95ac-8f74666605e1
 
-
-
 Or this:
 
 
