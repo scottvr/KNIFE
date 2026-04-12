@@ -113,7 +113,10 @@ Anyway, here's a couple videos of the aforementioned 3D fractals from the earlie
 https://github.com/user-attachments/assets/46f995da-a030-4220-b148-d935c1d37f0d
 
 
-https://github.com/user-attachments/assets/e4f33359-aebe-40a5-8ff0-78acb3fa61b3
+
+https://github.com/user-attachments/assets/f711a095-2734-41b9-a895-3d1243539094
+
+
 
 
 
