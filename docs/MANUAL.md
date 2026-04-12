@@ -111,11 +111,11 @@ These are the controls most users rely on every session:
 
 ### 6.1 Navigation and reset
 
-- Pan: arrow keys
+- Pan: arrow keys (alt pan keys: `[` `]` `,` `.`)
 - Zoom in/out: `=` / `-`
 - Recenter: `r`
 - Reset view defaults: `Shift+r`
-- Safety preset reset: `Alt/Option+r` (includes cycle state reset)
+- Safety preset reset: `Alt/Option+r` (includes cycle state reset; Volumetric also restores object home pose)
 - Undo last volumetric action: `Ctrl/Cmd+z` (Volumetric workspace, one-step depth)
 
 ### 6.2 Menus and overlays
@@ -285,7 +285,7 @@ Use this in order from least to most disruptive:
    Reset view to fractal defaults (center + zoom + initial palette).
 
 3. `Alt/Option+r`  
-   Safety preset reset: returns to home view and resets cycle state.
+   Safety preset reset: returns to home view, resets cycle state, and in Volumetric restores object transforms to home pose.
 
 Volumetric note:
 - all three reset paths also clear scene camera input offsets used for orbit/pan stabilization.
