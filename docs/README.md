@@ -47,9 +47,9 @@ https://blehg.paperclipmaximizer.ai/KNIFE/
 ## Some actual documentation
 
 [A Quick Start Guide](QUICK_START.md) is available, but the "quickest" way to start is to just jump in. Look at the screen, and press the `?` key.
-This will tell you how to do everything else. But, if you feel lost because you expect drop down menus with words and such on them, try reading the Quisckstart first.
+This will tell you how to do everything else. But, if you feel lost because you expect drop down menus with words and such on them, try reading the Quickstart first.
 
-For those that find it easy to navigate your way around the app, you might be interested in learning about [more advanced topics](REFERENCE.md), but again - you can just explore by clikcing things and pressing keys; you will learn quicklly that way.
+For those that find it easy to navigate your way around the app, you might be interested in learning about [more advanced topics](REFERENCE.md), but again - you can just explore by clikcing things and pressing keys; you will learn quickly that way.
 
 If you want the full boxed-manual treatment, start here:
 
