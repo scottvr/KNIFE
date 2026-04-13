@@ -31,6 +31,7 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 | Zoom In / Out | =/- (2D zoom in/out; 3D Shift = dolly, Ctrl/Cmd = focal length/FoV) | Wheel; click to zoom in; Shift+click to zoom out | Single tap to zoom in; two-finger tap to zoom out; pinch/stretch gesture; nav pad +/- (Camera Orbit mode: +/- dolly) | full |
 | Reset Ladder | r (recenter), Shift+r (recenter, default zoom), Alt/Option+r (recenter, default zoom, reset palette cycle state; volumetric: restore object poses) | Reset button (base recenter only) | Reset button (base recenter only) | partial |
 | Undo Last Volumetric Action | Ctrl/Cmd+z (undo last committed volumetric action; one-step depth) | N/A | N/A | gap |
+| Locate Lost Object (Volumetric) | j (volumetric emergency camera jump to selected or off-screen object) | Touch nav pad -> Find button | Touch nav pad -> Find button | partial |
 | Palette Menu / Next Palette | p (open/cycle), Shift+p (close), 1-9 (quick pick) | Palette button + menu | Palette button + menu | full |
 | Fractal Menu / Quick Fractal | f (menu), Shift+1-9 (quick fractal) | Fractal button + menu | Fractal button + menu | full |
 | Workspace Switch | Shift+w then workspace key (E=Explore, Q=Equation, D=Design, V=Volumetric) | Workspace panel buttons | Workspace panel buttons | full |
@@ -41,7 +42,7 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 | Scene Motion Pause/Resume | Space (pause/resume scene motion) | Scene Control menu -> Freeze Motion toggle | Scene Control menu -> Freeze Motion toggle | full |
 | Coordinates Overlay | u (toggle), Shift+u (reset panel position) | Coordinates button | Coordinates button | full |
 | Info Overlay | i (toggle), Shift+i (reset panel position) | Info button | Info button | full |
-| Hi-Res Toggle | m | Monitor button | Monitor button | full |
+| Display Scale Toggle | m | Monitor button | Monitor button | full |
 | Navigation Pad | n | Nav button (4-way icon); drag NAV badge to move panel | Nav button (4-way icon); Camera Orbit toggle maps arrows to camera orbit and +/- to dolly in volumetric | full |
 | Header Compact Toggle | k | Click KNIFE stats header | Tap KNIFE stats header | full |
 | Header/UI Visibility | h (header-only mode toggle), Shift+h (hide all UI) | Long-press KNIFE header (controls -> hide all), long-press UI hotspot (restore all) | Long-press KNIFE header (controls -> hide all), long-press UI hotspot (restore all) | full |
@@ -54,6 +55,7 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 **Parity Gaps**
 - Reset Ladder: Advanced reset tiers are keyboard-only.
 - Undo Last Volumetric Action: Volumetric workspace only; one-step undo depth.
+- Locate Lost Object (Volumetric): Available only in volumetric workspace; no direct canvas gesture binding.
 - Debug Console: Intentional goblin-mode keyboard access.
 - Design Mode (MVP): Pointer/touch path is available from the equation panel once opened.
 <!-- AUTO-GEN:INPUT_MAP:END -->
