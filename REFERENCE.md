@@ -42,7 +42,7 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 | Scene Motion Pause/Resume | Space (pause/resume scene motion) | Scene Control menu -> Freeze Motion toggle | Scene Control menu -> Freeze Motion toggle | full |
 | Coordinates Overlay | u (toggle), Shift+u (reset panel position) | Coordinates button | Coordinates button | full |
 | Info Overlay | i (toggle), Shift+i (reset panel position) | Info button | Info button | full |
-| Hi-Res Toggle | m | Monitor button | Monitor button | full |
+| Display Scale Toggle | m | Monitor button | Monitor button | full |
 | Navigation Pad | n | Nav button (4-way icon); drag NAV badge to move panel | Nav button (4-way icon); Camera Orbit toggle maps arrows to camera orbit and +/- to dolly in volumetric | full |
 | Header Compact Toggle | k | Click KNIFE stats header | Tap KNIFE stats header | full |
 | Header/UI Visibility | h (header-only mode toggle), Shift+h (hide all UI) | Long-press KNIFE header (controls -> hide all), long-press UI hotspot (restore all) | Long-press KNIFE header (controls -> hide all), long-press UI hotspot (restore all) | full |
