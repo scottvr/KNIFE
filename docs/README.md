@@ -103,8 +103,14 @@ https://github.com/user-attachments/assets/09c17e3e-326c-49cc-9509-1db030738a08
 
 So here's some video that shows a much better result from my "chrome" experiments, as well as a demonstration of the aforementioned random combinations of trig functions to find an interesting shape, then of lowering and raising the exponent in real-time, which gives some pretty neat effect as it "unfurls" and "recoils" itself in the process of exposing more "bulbs" (which have been flatted here by the short raymarching length and high epsilon):
 
+It also shows setting the phase ofd angle phi to cycle such that the fractal looks like it is infinitely "unfolding".
 
-https://github.com/user-attachments/assets/9ef1342b-e3f5-42cb-b87d-cebc22fa37bc
+
+
+https://github.com/user-attachments/assets/a884e887-f9af-4fd8-904b-2cbc9437445a
+
+
+
 
 
 ### And last but not least: The Fractal Fishtank!
