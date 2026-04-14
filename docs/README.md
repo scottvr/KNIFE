@@ -95,8 +95,15 @@ So the first thing I'll show cuz it's a little better quality than the video, is
 
 ![decent_chrome-look](https://github.com/user-attachments/assets/37f40f95-74cb-44a6-99f8-d54ff6901feb)
 
-A short while later, I had a better "chrome" appearance, with the introduction of some environmental-ish look (I don't have reflective solid surface textures in the environment, so this was done with a slightly contrived palette and intense colored lighting at angles I arrived at by just trying different locations in 3D space until it looked pretty good, even if it's a bit unnatural wrt "sky" and "earth shades coming from the proper directions. It's not enough to feel uncanny to me. I don't recall with the power was set to for this one, and I was just starting to experiment with raising the bailout factor when tweaking the formula. Increasing the raymarcher's epsilon is also useful for "smoothing" out a surface that you want to appear "shiny". (This was I think the biggest issue with my first attempt from above where it looked *reflective* in some way (like small single-cut diamonds to me) but didn't really screm "chrome!"):
+A short while later, I had a better "chrome" appearance, with this unfolding weird-trig, higher-power "mandelbulb"::
 
+
+
+https://github.com/user-attachments/assets/2406b110-c81b-4d8f-974d-ccd6dd53914d
+
+
+
+and one with an attempt at environmental reflections (earth and sky) to semi-successful-ish result:
 
 https://github.com/user-attachments/assets/09c17e3e-326c-49cc-9509-1db030738a08
 
