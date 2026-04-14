@@ -112,10 +112,13 @@ Here's one where I combined the goals of generative deep-sea creatures and Giger
 
 https://github.com/user-attachments/assets/0e127f3a-b47a-4e39-b4a6-f22acb1f2286
 
-One more video that shows a metallic look that looks satifying to me, as well as a demonstration of the aforementioned random combinations of trig functions to find an interesting shape. It also shows setting the phase of angle phi to cycle such that the fractal looks like it is infinitely "unfolding". (It proved a bit much for this 1GHz i5 with an Intel Iris graphics card, and you can see that it is struggling under the load. It runs great on anything more modern, including my (also outdated) iPhone X.)
+One more video that shows a metallic look that looks satifying to me, as well as a demonstration of the aforementioned random combinations of trig functions to find an interesting shape. It also shows setting the phase of angle phi to cycle such that the fractal looks like it is infinitely "unfolding". (It proved a bit much for this 1GHz i5 with an Intel Iris graphics card, and you can see that it is struggling under the load. It runs great on anything more modern, including my (also outdated) iPhone XR.)
 
 
-https://github.com/user-attachments/assets/a884e887-f9af-4fd8-904b-2cbc9437445a
+
+https://github.com/user-attachments/assets/6ce62b29-fab9-4c68-889d-c7947215d355
+
+
 
 
 ### And last but not least: The Fractal Fishtank!
