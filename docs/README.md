@@ -101,16 +101,14 @@ A short while later, I had a better "chrome" appearance, with the introduction o
 https://github.com/user-attachments/assets/09c17e3e-326c-49cc-9509-1db030738a08
 
 
-So here's some video that shows a much better result from my "chrome" experiments, as well as a demonstration of the aforementioned random combinations of trig functions to find an interesting shape, then of lowering and raising the exponent in real-time, which gives some pretty neat effect as it "unfurls" and "recoils" itself in the process of exposing more "bulbs" (which have been flatted here by the short raymarching length and high epsilon):
+Here's one where I combined the goals of generative deep-sea creatures and Giger-esque biomechanical demonic aliens! I was shocked it worked out this well. The video, from my phone of course did not.
 
-It also shows setting the phase ofd angle phi to cycle such that the fractal looks like it is infinitely "unfolding".
+https://github.com/user-attachments/assets/0e127f3a-b47a-4e39-b4a6-f22acb1f2286
 
+One more video that shows a metallic look that looks satifying to me, as well as a demonstration of the aforementioned random combinations of trig functions to find an interesting shape. It also shows setting the phase of angle phi to cycle such that the fractal looks like it is infinitely "unfolding". (It proved a bit much for this 1GHz i5 with an Intel Iris graphics card, and you can see that it is struggling under the load. It runs great on anything more modern, including my (also outdated) iPhone X.)
 
 
 https://github.com/user-attachments/assets/a884e887-f9af-4fd8-904b-2cbc9437445a
-
-
-
 
 
 ### And last but not least: The Fractal Fishtank!
