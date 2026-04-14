@@ -99,13 +99,13 @@ A short while later, I had a better "chrome" appearance, with this unfolding wei
 
 
 
-https://github.com/user-attachments/assets/2406b110-c81b-4d8f-974d-ccd6dd53914d
+https://github.com/user-attachments/assets/c3de2dde-18d5-4811-9fbc-0ea90a2c530c
 
 
 
 and one with an attempt at environmental reflections (earth and sky) to semi-successful-ish result:
 
-https://github.com/user-attachments/assets/09c17e3e-326c-49cc-9509-1db030738a08
+<img width="752" height="397" alt="better_chrome" src="https://github.com/user-attachments/assets/6bcadb54-cae1-49a3-a32a-02de137c88bf" />
 
 
 Here's one where I combined the goals of generative deep-sea creatures and Giger-esque biomechanical demonic aliens! I was shocked it worked out this well. The video, from my phone of course did not.
