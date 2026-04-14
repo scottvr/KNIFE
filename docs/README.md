@@ -64,7 +64,9 @@ Here's some of the best bulbs (but not the best images; taken on my phone and re
 ### The bioluminescent bulb:
 
 
-https://github.com/user-attachments/assets/88639542-790d-475f-8653-d65f09b4729c
+
+https://github.com/user-attachments/assets/7d5422e2-0ca4-4aa9-af03-eab4fe3f276f
+
 
 
 ## Colored lights can hypnotize:
