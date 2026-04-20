@@ -36,7 +36,7 @@ Need full depth after this card?
 
 ### Touch
 - Pan: one-finger drag
-- Zoom: pinch/spread
+- Zoom: pinch/spread or two finger slide forward/back)
 - Optional on-screen nav pad: press `n`
 
 ## Most useful controls
