@@ -1515,22 +1515,16 @@
     a.y += a.vy * dt;
     a.angle += a.spin * dt;
     a.age += dt;
-    const lifeT = Math.min(1, a.age / a.lifeSpan);
-    const growthT = Math.pow(lifeT,1.0);
-    const scale = a.growthStart + (a.growthMax - a.growthStart) * growthT;
+    const lifeT = a.age / Math.max(0.0001, a.lifeSpan);
+    const growthSpan = Math.max(0.0001, a.growthMax - a.growthStart);
+    const scale = a.growthStart + growthSpan * lifeT;
     a.r = a.baseR * scale;
-    const isJulia = isJuliaMode(a.mode);
-    if (isJulia) {
-      const zoomDrop = 0.34;
-      const zoomFloor = 0.48;
-      const zoomRatio = Math.max(zoomFloor, 1.08 - growthT * (zoomDrop * a.zoomRate));
-      a.fzoom = a.baseFzoom * zoomRatio;
-    } else {
-      // Non-Julia modes stay lock-step: world-space size grows while the complex-plane window stays stable.
-      a.fzoom = a.baseFzoom;
-    }
+    const zoomScale = Math.max(scale, 0.0001);
+    // Keep procedural zoom advancing as rocks grow, with no hard floor cap.
+    a.fzoom = a.baseFzoom / zoomScale;
     const hpT = a.maxHp > 1 ? (1 - a.hp / a.maxHp) : 0;
-    const cycleBoost = a.isBoss ? (1.4 + hpT * 2.8 + growthT * 1.7) : 1;
+    const growthForCycle = Math.min(1, lifeT);
+    const cycleBoost = a.isBoss ? (1.4 + hpT * 2.8 + growthForCycle * 1.7) : 1;
     a.fseed = fract(a.fseed + dt * a.seedCycleRate * cycleBoost);
     wrap(a);
   }

@@ -240,12 +240,9 @@ function createFractalRenderer(glCtx) {
         cplx = v_juliaC + cDrift;
       }
 
-      float zoomInv = max(1.0 / max(v_fractal.z, 0.0008), 1.0);
-      float zoomBoost = clamp(log2(zoomInv), 0.0, 7.0);
-      // Higher base iterations improve micro-detail on small gameplay-sized fractaloids.
-      float baseIter = clamp(mix(75.0, 150.0, v_sizeNorm) + zoomBoost * 34.0, 100.0, 250.0);
-      float iterBoost = isJulia ? 1.5 : 1.0;
-      int maxIter = int(clamp(baseIter * iterBoost, 100.0, 325.0));
+      // Linear iteration ramp by growth size ratio:
+      // v_sizeNorm = 0 at spawn size, 1 at ~3x spawn size.
+      int maxIter = int(mix(50.0, 150.0, clamp(v_sizeNorm, 0.0, 1.0)) + 0.5);
       int iBreak = maxIter;
       float smoothIter = float(maxIter);
       float smoothBase = 2.8;
@@ -267,7 +264,7 @@ function createFractalRenderer(glCtx) {
       float orbitTrapCross = 1e9;
       float orbitTrapCircle = 1e9;
 
-      for (int i = 0; i < 340; i++) {
+      for (int i = 0; i < 180; i++) {
         if (i >= maxIter) break;
         if (abs(mode - MODE_TAU) < 0.5) {
           z = cPowReal(z, TAU_POWER) + cplx;
@@ -524,7 +521,10 @@ function createFractalRenderer(glCtx) {
       data[o + 5] = a.fy;
       data[o + 6] = a.fzoom;
       data[o + 7] = a.fseed;
-      const detailNorm = Math.min(1, (a.r * dpr) / Math.max(1, Math.min(viewportW, viewportH) * 0.18));
+      const startRadius = Math.max(0.0001, a.baseR * (a.growthStart || 1));
+      const sizeRatio = a.r / startRadius;
+      // Iteration ramp: 1x start size => 50 iters, 3x start size => 150 iters.
+      const detailNorm = Math.max(0, Math.min(1, (sizeRatio - 1) * 0.5));
       data[o + 8] = detailNorm;
       data[o + 9] = a.mode || 0;
       data[o + 10] = a.jx || 0;
