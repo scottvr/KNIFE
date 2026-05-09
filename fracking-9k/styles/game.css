@@ -1,0 +1,264 @@
+  @import url('https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: 'VT323', monospace;
+    color: #fff;
+    touch-action: none;
+    overscroll-behavior: none;
+  }
+
+  #game-wrap {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  #game-wrap canvas {
+    display: block;
+    position: absolute;
+    inset: 0;
+    image-rendering: pixelated;
+    touch-action: none;
+  }
+  #game {
+    background: #000;
+    box-shadow: 0 0 40px rgba(255,255,255,0.06) inset;
+    z-index: 1;
+  }
+  #fractal-layer {
+    background: transparent;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* CRT scanlines */
+  #game-wrap::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0) 0px,
+      rgba(0,0,0,0) 2px,
+      rgba(0,0,0,0.09) 3px,
+      rgba(0,0,0,0.09) 4px
+    );
+    mix-blend-mode: multiply;
+    z-index: 5;
+  }
+
+  /* Vignette */
+  #game-wrap::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 58%, rgba(0,0,0,0.36) 100%);
+    z-index: 4;
+  }
+
+  /* HUD */
+  #hud {
+    position: fixed;
+    top: env(safe-area-inset-top, 12px);
+    left: 0;
+    right: 0;
+    padding: 12px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 14px;
+    color: #fff;
+    z-index: 10;
+    pointer-events: none;
+    text-shadow: 0 0 8px rgba(255,255,255,0.5);
+  }
+  #hud .col { display: flex; flex-direction: column; gap: 6px; }
+  #hud .col.right { align-items: flex-end; }
+  #lives { font-size: 18px; letter-spacing: 4px; }
+
+  /* Overlays */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    text-align: center;
+    padding: 24px;
+    color: #fff;
+    background: radial-gradient(circle at center, rgba(10,10,30,0.85), rgba(0,0,0,0.95));
+    backdrop-filter: blur(2px);
+  }
+
+  .title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(20px, 6vw, 48px);
+    line-height: 1.3;
+    margin-bottom: 8px;
+    letter-spacing: 2px;
+    text-shadow:
+      0 0 10px #fff,
+      0 0 20px #88f,
+      0 0 30px #44f;
+    animation: flicker 3s infinite;
+  }
+
+  .subtitle {
+    font-family: 'VT323', monospace;
+    font-size: clamp(18px, 3vw, 24px);
+    color: #ffcc00;
+    margin-bottom: 28px;
+    letter-spacing: 1px;
+  }
+
+  .instructions {
+    font-family: 'VT323', monospace;
+    font-size: clamp(16px, 2.5vw, 20px);
+    line-height: 1.5;
+    max-width: 480px;
+    margin-bottom: 32px;
+    opacity: 0.85;
+  }
+  .instructions .key {
+    display: inline-block;
+    border: 2px solid #fff;
+    padding: 2px 8px;
+    margin: 2px 2px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.75em;
+  }
+
+  .btn {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(14px, 2.5vw, 18px);
+    padding: 16px 28px;
+    background: #000;
+    color: #fff;
+    border: 3px solid #fff;
+    cursor: pointer;
+    letter-spacing: 2px;
+    transition: all 0.15s;
+    pointer-events: auto;
+  }
+  .btn:hover, .btn:active {
+    background: #fff;
+    color: #000;
+    transform: scale(1.05);
+    box-shadow: 0 0 20px #fff;
+  }
+
+  @keyframes flicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.95; }
+    52% { opacity: 0.7; }
+    54% { opacity: 1; }
+  }
+
+  /* Mobile touch controls */
+  #touch-controls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0 20px env(safe-area-inset-bottom, 20px) 20px;
+    display: none;
+    justify-content: space-between;
+    align-items: flex-end;
+    z-index: 15;
+    pointer-events: none;
+  }
+
+  .touch-left, .touch-right {
+    display: flex;
+    gap: 12px;
+    pointer-events: auto;
+  }
+  .touch-right { flex-direction: column; align-items: flex-end; }
+  .touch-right .row { display: flex; gap: 12px; }
+
+  .tbtn {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    border: 2px solid rgba(255,255,255,0.5);
+    color: #fff;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    cursor: pointer;
+    transition: all 0.08s;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .tbtn.active {
+    background: rgba(255,255,255,0.4);
+    border-color: #fff;
+    transform: scale(0.92);
+    box-shadow: 0 0 16px rgba(255,255,255,0.6);
+  }
+  .tbtn.fire {
+    width: 80px;
+    height: 80px;
+    background: rgba(255, 80, 80, 0.15);
+    border-color: rgba(255, 100, 100, 0.7);
+    color: #ff6464;
+  }
+  .tbtn.fire.active {
+    background: rgba(255, 80, 80, 0.5);
+    box-shadow: 0 0 20px rgba(255,80,80,0.8);
+  }
+  .tbtn.thrust {
+    background: rgba(80, 180, 255, 0.15);
+    border-color: rgba(100, 200, 255, 0.7);
+    color: #64c8ff;
+  }
+  .tbtn.thrust.active {
+    background: rgba(80, 180, 255, 0.5);
+    box-shadow: 0 0 20px rgba(80,180,255,0.8);
+  }
+
+  body.mobile #touch-controls { display: flex; }
+
+  body.playing #game-wrap,
+  body.playing #game-wrap * {
+    cursor: none !important;
+  }
+
+  .hidden { display: none !important; }
+
+  .ascii-rock {
+    font-family: 'VT323', monospace;
+    font-size: 14px;
+    line-height: 1;
+    color: #888;
+    margin-bottom: 24px;
+    white-space: pre;
+    opacity: 0.7;
+  }
+
+  .credit {
+    position: absolute;
+    bottom: 20px;
+    font-family: 'VT323', monospace;
+    font-size: 14px;
+    opacity: 0.4;
+    letter-spacing: 2px;
+  }

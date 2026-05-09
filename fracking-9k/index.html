@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>FRACKING 9000</title>
+<link rel="stylesheet" href="./styles/game.css">
+</head>
+<body>
+
+<div id="game-wrap">
+  <canvas id="game"></canvas>
+  <canvas id="fractal-layer"></canvas>
+</div>
+
+<div id="hud" class="hidden">
+  <div class="col">
+    <div id="score">00</div>
+  </div>
+  <div class="col right">
+    <div id="lives">^^^</div>
+    <div id="wave" style="font-size: 11px; opacity: 0.7;">WAVE 1</div>
+  </div>
+</div>
+
+<div id="touch-controls">
+  <div class="touch-left">
+    <button class="tbtn" id="btn-left" aria-label="Rotate Left">◄</button>
+    <button class="tbtn" id="btn-right" aria-label="Rotate Right">►</button>
+  </div>
+  <div class="touch-right">
+    <div class="row">
+      <button class="tbtn thrust" id="btn-thrust" aria-label="Thrust">▲</button>
+      <button class="tbtn" id="btn-hyper" aria-label="Hyperspace" style="font-size:12px;">HYP</button>
+    </div>
+    <div class="row" style="margin-top: 12px;">
+      <button class="tbtn fire" id="btn-fire" aria-label="Fire">●</button>
+    </div>
+  </div>
+</div>
+
+<div id="title-screen" class="overlay">
+  <div class="ascii-rock">      .--.
+   .'_\/_'.
+   '. /\ .'
+     "''"</div>
+  <h1 class="title">FRACKING 9000</h1>
+  <div class="subtitle">★ complex-plane extraction mayhem ★</div>
+  <div class="instructions" id="desktop-instr">
+    <span class="key">←</span> <span class="key">→</span> rotate &nbsp;
+    <span class="key">↑</span> thrust<br>
+    <span class="key">SPACE</span> blast &nbsp;
+    <span class="key">SHIFT</span> hyperspace
+  </div>
+  <div class="instructions hidden" id="mobile-instr">
+    tap buttons to rotate, thrust,<br>
+    fire, and hyperspace<br>
+    <span style="opacity:0.6;">don't get pulverized by fractaloids</span>
+  </div>
+  <button class="btn" id="start-btn">PRESS START</button>
+  <div class="credit">© 19XX FRACKTRONICS</div>
+</div>
+
+<div id="gameover-screen" class="overlay hidden">
+  <h1 class="title" style="font-size: clamp(28px, 8vw, 64px);">GAME OVER</h1>
+  <div class="subtitle" id="final-score">SCORE: 0</div>
+  <div class="instructions">your ship is now space gravel</div>
+  <button class="btn" id="restart-btn">TRY AGAIN</button>
+</div>
+
+<script src="./scripts/ship-icon.js"></script>
+<script src="./scripts/audio.js"></script>
+<script src="./scripts/heartbeat.js"></script>
+<script src="./scripts/input.js"></script>
+<script src="./scripts/fractal-renderer.js"></script>
+<script src="./scripts/game.js"></script>
+
+</body>
+</html>
