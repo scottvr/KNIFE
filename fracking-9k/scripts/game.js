@@ -1520,8 +1520,13 @@
     const scale = a.growthStart + growthSpan * lifeT;
     a.r = a.baseR * scale;
     const zoomScale = Math.max(scale, 0.0001);
-    // Keep procedural zoom advancing as rocks grow, with no hard floor cap.
-    a.fzoom = a.baseFzoom / zoomScale;
+    if (isJuliaMode(a.mode)) {
+      // Julia keeps drilling inward as it grows.
+      a.fzoom = a.baseFzoom / zoomScale;
+    } else {
+      // Non-Julia co-zooms outward with world growth so the original segment remains contained.
+      a.fzoom = a.baseFzoom * zoomScale;
+    }
     const hpT = a.maxHp > 1 ? (1 - a.hp / a.maxHp) : 0;
     const growthForCycle = Math.min(1, lifeT);
     const cycleBoost = a.isBoss ? (1.4 + hpT * 2.8 + growthForCycle * 1.7) : 1;
