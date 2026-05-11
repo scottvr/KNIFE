@@ -324,7 +324,7 @@ function createFractalRenderer(glCtx) {
       float insideMask = insideMaskHard;
       if (!isJulia) {
         // Soften non-Julia interior fill to avoid a stamped dark silhouette.
-        insideMask = smoothstep(0.76, 0.998, iterRatio);
+        insideMask = smoothstep(0.76, 0.8, iterRatio);
       }
       if (isMagnet) {
         // Magnet benefits from an even softer interior gate so shape detail dominates.

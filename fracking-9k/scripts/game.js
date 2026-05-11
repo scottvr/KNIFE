@@ -5,9 +5,35 @@
   // SETUP
   // ============================================================
   const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d');
   const fractalCanvas = document.getElementById('fractal-layer');
-  const gl = fractalCanvas.getContext('webgl2', { alpha: true, antialias: true, premultipliedAlpha: false });
+  const ctx = canvas ? canvas.getContext('2d') : null;
+  const gl = fractalCanvas ? fractalCanvas.getContext('webgl2', { alpha: true, antialias: true, premultipliedAlpha: false }) : null;
+  const bootIssues = { warnings: [], critical: [] };
+  function noteBootWarning(msg) { bootIssues.warnings.push(msg); }
+  function noteBootCritical(msg) { bootIssues.critical.push(msg); }
+  let bootBlocked = false;
+
+  if (!canvas) noteBootCritical('Missing #game canvas element.');
+  if (!ctx) noteBootCritical('2D canvas context is unavailable.');
+  if (!fractalCanvas) noteBootCritical('Missing #fractal-layer canvas element.');
+  if (!(window.FrackingInput && typeof window.FrackingInput.create === 'function')) {
+    noteBootCritical('Input module missing; controls are unavailable.');
+  }
+  if (!(window.FrackingFractaloidPalette && typeof window.FrackingFractaloidPalette.create === 'function')) {
+    noteBootWarning('Palette module missing; using simplified palette fallback.');
+  }
+  if (!(window.FrackingFractaloidEffects && typeof window.FrackingFractaloidEffects.create === 'function')) {
+    noteBootWarning('Fractaloid effects module missing; spawn telegraph disabled.');
+  }
+  if (!(window.FrackingFunPack && typeof window.FrackingFunPack.create === 'function')) {
+    noteBootWarning('Fun pack module missing; adaptive pacing/combo simplified.');
+  }
+  if (!(window.FrackingInputFeel && typeof window.FrackingInputFeel.create === 'function')) {
+    noteBootWarning('Input-feel module missing; using direct input without tap grace/buffer.');
+  }
+  if (!(window.FrackingThreatCues && typeof window.FrackingThreatCues.create === 'function')) {
+    noteBootWarning('Threat-cues module missing; nearest threat rings disabled.');
+  }
   const fractalRendererFactory = (window.FrackingFractalRenderer && typeof window.FrackingFractalRenderer.create === 'function')
     ? window.FrackingFractalRenderer.create
     : null;
@@ -17,9 +43,10 @@
       fractalRenderer = fractalRendererFactory(gl);
     } catch (err) {
       console.warn('GL fractaloid renderer unavailable, using vector fallback.', err);
+      noteBootWarning('GL fractaloid renderer failed to initialize; using vector fallback.');
     }
   } else if (gl && !fractalRendererFactory) {
-    console.warn('Fractal renderer module missing; using vector fallback.');
+    noteBootWarning('Fractal renderer module missing; using vector fallback.');
   }
 
   const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
@@ -29,11 +56,60 @@
     document.getElementById('mobile-instr').classList.remove('hidden');
   }
 
+  function renderBootIssues() {
+    if (bootIssues.warnings.length) {
+      console.warn('[Boot warnings]', bootIssues.warnings.join(' | '));
+    }
+    if (!bootIssues.critical.length && !bootIssues.warnings.length) return;
+    const titleScreen = document.getElementById('title-screen');
+    if (!titleScreen) return;
+
+    const panel = document.createElement('div');
+    panel.style.maxWidth = '720px';
+    panel.style.margin = '12px 0 18px';
+    panel.style.padding = '10px 14px';
+    panel.style.border = '2px solid';
+    panel.style.textAlign = 'left';
+    panel.style.fontFamily = '"VT323", monospace';
+    panel.style.fontSize = '19px';
+    panel.style.lineHeight = '1.28';
+    panel.style.whiteSpace = 'pre-wrap';
+
+    const warningText = bootIssues.warnings.length
+      ? 'Warnings:\n- ' + bootIssues.warnings.join('\n- ')
+      : '';
+    if (bootIssues.critical.length) {
+      bootBlocked = true;
+      panel.style.borderColor = '#ff6868';
+      panel.style.color = '#ffd5d5';
+      const criticalText = 'Startup blocked (critical):\n- ' + bootIssues.critical.join('\n- ');
+      panel.textContent = warningText ? (criticalText + '\n\n' + warningText) : criticalText;
+      const startBtn = document.getElementById('start-btn');
+      const restartBtn = document.getElementById('restart-btn');
+      if (startBtn) {
+        startBtn.disabled = true;
+        startBtn.textContent = 'MODULE ERROR';
+        startBtn.style.opacity = '0.6';
+      }
+      if (restartBtn) {
+        restartBtn.disabled = true;
+        restartBtn.style.opacity = '0.6';
+      }
+    } else {
+      panel.style.borderColor = '#ffd166';
+      panel.style.color = '#ffe5ad';
+      panel.textContent = warningText;
+    }
+    titleScreen.insertBefore(panel, titleScreen.querySelector('.btn'));
+  }
+
   let W = 0, H = 0, DPR = 1;
 
   function resize() {
+    if (!canvas || !ctx || !fractalCanvas) return;
     DPR = Math.min(window.devicePixelRatio || 1, 2);
     const wrap = document.getElementById('game-wrap');
+    if (!wrap) return;
     W = wrap.clientWidth;
     H = wrap.clientHeight;
     canvas.style.width = W + 'px';
@@ -98,16 +174,70 @@
         }
       })
     : {
-        keys: { left: false, right: false, thrust: false, fire: false, hyper: false },
+        keys: { left: false, right: false, thrust: false, fire: false, hyper: false, inspectMod: false },
         consumeHyperPressed: () => false,
         destroy: () => {}
       };
   const keys = inputSystem.keys;
+  const inputFeelSystem = (window.FrackingInputFeel && typeof window.FrackingInputFeel.create === 'function')
+    ? window.FrackingInputFeel.create({
+        keys,
+        consumeHyperPressed: () => inputSystem.consumeHyperPressed(),
+        fireGraceSec: 0.09,
+        thrustGraceSec: 0.08,
+        hyperBufferSec: 0.22
+      })
+    : (() => {
+        let hyperBuffered = false;
+        return {
+          tick: () => { hyperBuffered = !!inputSystem.consumeHyperPressed(); },
+          getIntents: () => ({ fire: !!keys.fire, thrust: !!keys.thrust }),
+          consumeHyperBuffered: () => {
+            const was = hyperBuffered;
+            hyperBuffered = false;
+            return was;
+          },
+          reset: () => { hyperBuffered = false; }
+        };
+      })();
+
+  function nudgeFractalDive(code, shiftKey = false) {
+    if (state !== 'fractaldive' || !fractalDive) return false;
+    const d = fractalDive;
+    const panStep = Math.max(d.zoom * (shiftKey ? 0.38 : 0.16), 1e-7);
+    if (code === 'ArrowLeft' || code === 'KeyA') d.panX -= panStep;
+    else if (code === 'ArrowRight' || code === 'KeyD') d.panX += panStep;
+    else if (code === 'ArrowUp' || code === 'KeyW') d.panY -= panStep;
+    else if (code === 'ArrowDown' || code === 'KeyS') d.panY += panStep;
+    else if (code === 'KeyQ' || code === 'Minus' || code === 'NumpadSubtract') d.zoom = clampDiveZoom(d.zoom * FRACTAL_DIVE_ZOOM_STEP_OUT);
+    else if (code === 'KeyE' || code === 'Equal' || code === 'NumpadAdd') d.zoom = clampDiveZoom(d.zoom * FRACTAL_DIVE_ZOOM_STEP_IN);
+    else if (code === 'KeyR') {
+      d.panX = 0;
+      d.panY = 0;
+      d.zoom = clampDiveZoom(d.zoom);
+    } else if (code === 'Escape') {
+      exitFractalDive();
+    } else {
+      return false;
+    }
+    return true;
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (state !== 'fractaldive') return;
+    if (nudgeFractalDive(e.code, !!e.shiftKey)) e.preventDefault();
+  });
+
+  window.addEventListener('wheel', (e) => {
+    if (state !== 'fractaldive' || !fractalDive) return;
+    fractalDive.zoom = clampDiveZoom(fractalDive.zoom * (e.deltaY > 0 ? FRACTAL_DIVE_ZOOM_STEP_OUT : FRACTAL_DIVE_ZOOM_STEP_IN));
+    e.preventDefault();
+  }, { passive: false });
 
   // ============================================================
   // GAME STATE
   // ============================================================
-  let state = 'title'; // title | playing | dying | wavebreak | gameover
+  let state = 'title'; // title | playing | dying | wavebreak | gameover | fractaldive
   let score = 0;
   let lives = 9;
   let wave = 1;
@@ -121,9 +251,35 @@
   let shockwaves = [];
   let saucer = null;
   let saucerBullets = [];
+  let activeThreatCues = [];
   let saucerTimer = 0;
   let waveProfile = null;
   let activeFractaloidClass = 'mandelbrot';
+  let fractalDive = null;
+  const funPack = (window.FrackingFunPack && typeof window.FrackingFunPack.create === 'function')
+    ? window.FrackingFunPack.create()
+    : {
+        resetChain: () => {},
+        resetRun: () => {},
+        tick: () => {},
+        award: (baseScore) => Math.max(1, Math.floor(baseScore || 0)),
+        triggerReliefForLives: () => {},
+        computeWavePace: () => ({ spawnMul: 1, speedMul: 1, saucerCadenceMul: 1 }),
+        getChainLabel: () => ''
+      };
+  const fractaloidEffects = (window.FrackingFractaloidEffects && typeof window.FrackingFractaloidEffects.create === 'function')
+    ? window.FrackingFractaloidEffects.create({ ctx })
+    : {
+        modeTelegraphHue: () => 190,
+        drawSpawnTelegraph: () => {}
+      };
+  const threatCueSystem = (window.FrackingThreatCues && typeof window.FrackingThreatCues.create === 'function')
+    ? window.FrackingThreatCues.create({ ctx })
+    : {
+        compute: () => [],
+        draw: () => {}
+      };
+  let wavePace = { spawnMul: 1, speedMul: 1, saucerCadenceMul: 1 };
 
   // Tunable constants (classic-ish)
   const SHIP_SIZE = 22;
@@ -135,13 +291,14 @@
   const BULLET_LIFE = 0.85;
   const MAX_BULLETS = 8; // power-of-two ammo ceiling
   const FIRE_COOLDOWN_BASE = 0.04;
-  const FIRE_PATTERN = [1, 1,  2, 1, 1, 4, 1, 1, 8];
+  const FIRE_PATTERN = [2, 2,  4, 2, 2, 4, 8, 4, 2];
   const SHIP_FRACTAL_CLASS = 'mandelbrot_outline'; // 'sierpinski' | 'mandelbrot_outline'
   const FRACTALOID_CLASS = 'cycle'; // 'cycle' | 'tau' | 'magnet' | 'buffalo' | 'tricorn' | 'julia' | 'mande
   const SHIP_FRACTAL_CLASSES = ['sierpinski', 'mandelbrot_outline'];
   const FRACTALOID_CLASSES = ['tau', 'magnet', 'buffalo', 'tricorn', 'julia', 'mandelbrot'];
   const FRACTALOID_CLASS_SEQUENCE = [ 'mandelbrot', 'magnet', 'julia', 'buffalo', 'tricorn', 'julia', 'mandelbrot', 'tau'];
   const FRACTALOID_MIX_AFTER_CYCLE = true;
+  const FRACTAL_DIVE_AUTO_WAVE_INTERVAL = Math.max(1, FRACTALOID_CLASS_SEQUENCE.length);
   const FRACTALOID_CLASS_MODES = {
     tau: 0,
     julia: 1,
@@ -164,15 +321,15 @@
       label: 'MANDELBROT',
       focusX: -0.450,
       focusY: 0.003,
-      zoomBase: 0.92,
+      zoomBase: 1.02,
       zoomVariance: 0.52,
-      zoomMin: 0.38,
-      zoomMax: 2.35,
+      zoomMin: 1.0,
+      zoomMax: 2.5,
       spreadMul: 0.94,
-      waveZoomMul: 0.58,
+      waveZoomMul: 0.8,
       childZoomMin: 0.62,
-      childZoomMax: 0.82,
-      childTangent: 0.21
+      childZoomMax: 0.92,
+      childTangent: 0.31
     },
     tau: {
       mode: FRACTALOID_CLASS_MODES.tau,
@@ -312,6 +469,11 @@
   const SHOCKWAVE_LIFE = 0.62;
   const SHOCKWAVE_RADIUS_GAIN = 2.2;
   const SHOCKWAVE_WIDTH = 2.2;
+  const FRACTAL_DIVE_MIN_WAVE = 6;
+  const FRACTAL_DIVE_ZOOM_STEP_IN = 0.88;
+  const FRACTAL_DIVE_ZOOM_STEP_OUT = 1.14;
+  const FRACTAL_DIVE_MIN_ZOOM = 1e-9;
+  const FRACTAL_DIVE_MAX_ZOOM = 12.0;
   const WAVE_GENOMES = [
     { name: 'Filament', focusX: -0.7445, focusY: 0.1318, seedBias: 0.06, spread: 1.0, zoomBase: 1.62 },
     { name: 'Seahorse', focusX: -0.748, focusY: 0.104, seedBias: 0.24, spread: 0.9, zoomBase: 1.72 },
@@ -319,8 +481,23 @@
     { name: 'Elephant', focusX: 0.285, focusY: 0.012, seedBias: 0.78, spread: 0.72, zoomBase: 1.78 }
   ];
 
-  const SAUCER_LARGE = { r: 19, score: 200, speed: 90, fireRate: 1.6, accuracy: 0.0 };
-  const SAUCER_SMALL = { r: 16, score: 1000, speed: 130, fireRate: 1.0, accuracy: 0.85 };
+  const SAUCER_LARGE = { r: 18, score: 200, speed: 90, fireRate: 1.6, accuracy: 0.0 };
+  const SAUCER_SMALL = { r: 15, score: 1000, speed: 130, fireRate: 1.0, accuracy: 0.75 };
+  const paletteSystem = (window.FrackingFractaloidPalette && typeof window.FrackingFractaloidPalette.create === 'function')
+    ? window.FrackingFractaloidPalette.create({
+        paletteModes: FRACTALOID_PALETTE_MODES,
+        classModes: FRACTALOID_CLASS_MODES
+      })
+    : {
+        pickFractaloidPaletteMode: (mode, isBoss = false, parentMode = null) => {
+          if (parentMode != null && Math.random() < 0.82) return parentMode;
+          if (mode === FRACTALOID_CLASS_MODES.julia) {
+            return isBoss ? FRACTALOID_PALETTE_MODES.plasma : FRACTALOID_PALETTE_MODES.firefly;
+          }
+          return isBoss ? FRACTALOID_PALETTE_MODES.cosmic : FRACTALOID_PALETTE_MODES.ember;
+        },
+        pickVibrantPaletteSeed: (seedHint = Math.random()) => fract(fract(seedHint) + 1)
+      };
 
   // ============================================================
   // UTILITIES
@@ -336,174 +513,6 @@
   }
   function waveNoise(w, salt) { return fract(Math.sin(w * 127.1 + salt * 311.7) * 43758.5453123); }
   function waveRange(w, salt, min, max) { return min + (max - min) * waveNoise(w, salt); }
-  function weightedPickPaletteMode(weightedModes) {
-    let total = 0;
-    for (const item of weightedModes) total += Math.max(0, item[1]);
-    if (total <= 0) return weightedModes[0][0];
-
-    let roll = Math.random() * total;
-    for (const item of weightedModes) {
-      const weight = Math.max(0, item[1]);
-      if (roll <= weight) return item[0];
-      roll -= weight;
-    }
-    return weightedModes[weightedModes.length - 1][0];
-  }
-
-  function pickFractaloidPaletteMode(mode, isBoss = false, parentMode = null) {
-    if (parentMode != null && Math.random() < 0.82) {
-      return parentMode;
-    }
-
-    const P = FRACTALOID_PALETTE_MODES;
-    const isJulia = mode === FRACTALOID_CLASS_MODES.julia;
-    const weighted = isBoss
-      ? (isJulia
-          ? [[P.plasma, 0.36], [P.gold, 0.24], [P.ember, 0.18], [P.cosmic, 0.16], [P.firefly, 0.06]]
-          : [[P.plasma, 0.34], [P.cosmic, 0.26], [P.gold, 0.22], [P.ember, 0.10], [P.firefly, 0.08]])
-      : (isJulia
-          ? [[P.firefly, 0.30], [P.ember, 0.26], [P.gold, 0.20], [P.cosmic, 0.14], [P.plasma, 0.10]]
-          : [[P.cosmic, 0.34], [P.plasma, 0.24], [P.gold, 0.20], [P.ember, 0.14], [P.firefly, 0.08]]);
-
-    return weightedPickPaletteMode(weighted);
-  }
-
-  function paletteRgbAt(t, seed, paletteMode = FRACTALOID_PALETTE_MODES.cosmic) {
-    const tau = Math.PI * 2;
-    const phase = seed * tau;
-    const cycle = phase;
-    const p = t;
-    const mix = (a, b, m) => a + (b - a) * m;
-
-    if (paletteMode === FRACTALOID_PALETTE_MODES.ember) {
-      const q = fract(p + cycle * 0.05 + seed * 0.37);
-      const c0 = [0.010, 0.000, 0.000];
-      const c1 = [0.180, 0.000, 0.000];
-      const c2 = [0.600, 0.080, 0.000];
-      const c3 = [1.000, 0.420, 0.060];
-      const c4 = [1.000, 0.900, 0.350];
-      let a = c0;
-      let b = c1;
-      let m = q / 0.22;
-      if (q >= 0.22 && q < 0.50) {
-        a = c1;
-        b = c2;
-        m = (q - 0.22) / 0.28;
-      } else if (q >= 0.50 && q < 0.78) {
-        a = c2;
-        b = c3;
-        m = (q - 0.50) / 0.28;
-      } else if (q >= 0.78) {
-        a = c3;
-        b = c4;
-        m = (q - 0.78) / 0.22;
-      }
-      return [mix(a[0], b[0], m), mix(a[1], b[1], m), mix(a[2], b[2], m)];
-    }
-
-    if (paletteMode === FRACTALOID_PALETTE_MODES.firefly) {
-      const p2 = (p + seed * 0.11) * tau + cycle * 1.1;
-      const g = Math.pow(0.5 + 0.5 * Math.sin(p2 + 0.7), 2.5);
-      return [
-        clamp(0.02 + 0.18 * g, 0, 1),
-        clamp(0.08 + 0.55 * g, 0, 1),
-        clamp(0.01 + 0.10 * Math.sin(p2 * 0.6 + 2.0 + seed * 4.0), 0, 1)
-      ];
-    }
-
-    if (paletteMode === FRACTALOID_PALETTE_MODES.gold) {
-      const sn = Math.max(p + seed * 0.06, 0.000001);
-      const q = fract(Math.pow(sn, 0.35) * 0.15 + cycle * 0.02 + seed * 0.28);
-      const c0 = [0.000, 0.027, 0.392];
-      const c1 = [0.125, 0.420, 0.796];
-      const c2 = [0.929, 1.000, 1.000];
-      const c3 = [1.000, 0.667, 0.000];
-      const c4 = [0.000, 0.008, 0.000];
-      let a = c0;
-      let b = c1;
-      let m = q / 0.1600;
-      if (q >= 0.1600 && q < 0.4200) {
-        a = c1;
-        b = c2;
-        m = (q - 0.1600) / 0.2600;
-      } else if (q >= 0.4200 && q < 0.6425) {
-        a = c2;
-        b = c3;
-        m = (q - 0.4200) / 0.2225;
-      } else if (q >= 0.6425 && q < 0.8575) {
-        a = c3;
-        b = c4;
-        m = (q - 0.6425) / 0.2150;
-      } else if (q >= 0.8575) {
-        a = c4;
-        b = c0;
-        m = (q - 0.8575) / 0.1425;
-      }
-      return [mix(a[0], b[0], m), mix(a[1], b[1], m), mix(a[2], b[2], m)];
-    }
-
-    if (paletteMode === FRACTALOID_PALETTE_MODES.plasma) {
-      const p2 = p * 2.0 + cycle * 2.0 + seed * tau;
-      return [
-        0.5 + 0.5 * Math.sin(p2),
-        0.5 + 0.5 * Math.sin(p2 + 2.094),
-        0.5 + 0.5 * Math.sin(p2 + 4.188)
-      ];
-    }
-
-    return [
-      0.5 + 0.5 * Math.cos(3.0 + p + cycle * 0.5 + cycle * 0.31),
-      0.5 + 0.5 * Math.cos(3.0 + p * 0.7 + cycle * 0.3 + cycle * 0.19),
-      0.5 + 0.5 * Math.cos(3.0 + p * 0.5 + cycle * 0.2 + cycle * 0.11)
-    ];
-  }
-
-  function paletteVibranceScore(seed, paletteMode = FRACTALOID_PALETTE_MODES.cosmic) {
-    const samples = [0.06, 0.19, 0.33, 0.51, 0.74, 0.91];
-    let chromaSum = 0;
-    let minChroma = Infinity;
-    let lumaMin = Infinity;
-    let lumaMax = -Infinity;
-    for (const t of samples) {
-      const [r, g, b] = paletteRgbAt(t, seed, paletteMode);
-      const hi = Math.max(r, g, b);
-      const lo = Math.min(r, g, b);
-      const chroma = hi - lo;
-      const luma = r * 0.2126 + g * 0.7152 + b * 0.0722;
-      chromaSum += chroma;
-      minChroma = Math.min(minChroma, chroma);
-      lumaMin = Math.min(lumaMin, luma);
-      lumaMax = Math.max(lumaMax, luma);
-    }
-    const avgChroma = chromaSum / samples.length;
-    const lumaSpan = lumaMax - lumaMin;
-    return avgChroma * 0.7 + minChroma * 0.9 + lumaSpan * 0.4;
-  }
-
-  function pickVibrantPaletteSeed(seedHint = Math.random(), paletteMode = FRACTALOID_PALETTE_MODES.cosmic) {
-    const norm = (v) => fract(fract(v) + 1);
-    const threshold = paletteMode === FRACTALOID_PALETTE_MODES.firefly ? 0.21 : 0.26;
-    const candidates = [
-      norm(seedHint),
-      norm(seedHint + 0.137),
-      norm(seedHint + 0.319),
-      norm(seedHint + 0.618),
-      Math.random(),
-      Math.random()
-    ];
-
-    let bestSeed = candidates[0];
-    let bestScore = -Infinity;
-    for (const seed of candidates) {
-      const score = paletteVibranceScore(seed, paletteMode);
-      if (score > bestScore) {
-        bestScore = score;
-        bestSeed = seed;
-      }
-      if (score >= threshold) return seed;
-    }
-    return bestSeed;
-  }
 
   function cPowReal(re, im, power) {
     const r = Math.hypot(re, im);
@@ -853,6 +862,10 @@
     };
   }
 
+  function computeAdaptiveWavePace(w) {
+    return funPack.computeWavePace(w, lives);
+  }
+
   function getShipFractalClass() {
     return SHIP_FRACTAL_CLASSES.includes(SHIP_FRACTAL_CLASS) ? SHIP_FRACTAL_CLASS : 'sierpinski';
   }
@@ -896,7 +909,6 @@
   }
 
   function resolveFractaloidClassForWave(w) {
-    if (FRACTALOID_CLASS === 'mandelbrot') return 'tau';
     if (FRACTALOID_CLASSES.includes(FRACTALOID_CLASS)) return FRACTALOID_CLASS;
     if (isMixedFractaloidWave(w)) return 'mixed';
     const seq = getFractaloidClassSequence();
@@ -1116,12 +1128,13 @@
 
   function updateShip(s, dt) {
     if (!s.alive) return;
+    const intents = inputFeelSystem.getIntents();
     if (s.invuln > 0) s.invuln -= dt;
 
     if (keys.left) s.angle -= SHIP_TURN * dt;
     if (keys.right) s.angle += SHIP_TURN * dt;
 
-    s.thrusting = keys.thrust;
+    s.thrusting = intents.thrust;
     if (s.thrusting) {
       s.vx += Math.cos(s.angle) * SHIP_THRUST * dt;
       s.vy += Math.sin(s.angle) * SHIP_THRUST * dt;
@@ -1144,15 +1157,15 @@
     wrap(s);
 
     s.fireTimer -= dt;
-    if (!keys.fire && s.fireTimer <= FIRE_COOLDOWN_BASE) {
+    if (!intents.fire && s.fireTimer <= FIRE_COOLDOWN_BASE) {
       s.shotPhase = 0;
     }
 
-    if (keys.fire && s.fireTimer <= 0 && bullets.length < MAX_BULLETS) {
+    if (intents.fire && s.fireTimer <= 0 && bullets.length < MAX_BULLETS) {
       fireBullet(s);
       s.fireTimer = nextFireCooldown(s);
     }
-    if (inputSystem.consumeHyperPressed()) {
+    if (inputFeelSystem.consumeHyperBuffered()) {
       hyperspace(s);
     }
   }
@@ -1186,6 +1199,7 @@
   function killShip() {
     if (!ship.alive || ship.invuln > 0) return;
     ship.alive = false;
+    funPack.resetChain();
     explode(ship.x, ship.y, 24, 1.5);
     sfx.death();
     state = 'dying';
@@ -1255,13 +1269,13 @@
     const shapeScale = isJulia
       ? getJuliaAreaScale(julia.jx, julia.jy, fx, fy, fzoom)
       : 1;
-    const paletteMode = pickFractaloidPaletteMode(mode, isBoss, null);
+    const paletteMode = paletteSystem.pickFractaloidPaletteMode(mode, isBoss, null);
     return {
       className,
       fx,
       fy,
       fzoom,
-      fseed: pickVibrantPaletteSeed(profile.seedBias + Math.random() * 0.43, paletteMode),
+      fseed: paletteSystem.pickVibrantPaletteSeed(profile.seedBias + Math.random() * 0.43, paletteMode),
       frot: Math.random() * Math.PI * 2,
       mode,
       paletteMode,
@@ -1342,13 +1356,13 @@
       ? getJuliaAreaScale(julia.jx, julia.jy, fx, fy, fzoom)
       : 1;
     const parentPaletteMode = parent.paletteMode != null ? parent.paletteMode : null;
-    const paletteMode = pickFractaloidPaletteMode(mode, isBoss || parent.isBoss, parentPaletteMode);
+    const paletteMode = paletteSystem.pickFractaloidPaletteMode(mode, isBoss || parent.isBoss, parentPaletteMode);
     return {
       className,
       fx,
       fy,
       fzoom,
-      fseed: pickVibrantPaletteSeed(parent.fseed + profile.paletteDrift + rand(0.04, 0.2), paletteMode),
+      fseed: paletteSystem.pickVibrantPaletteSeed(parent.fseed + profile.paletteDrift + rand(0.04, 0.2), paletteMode),
       frot: parent.frot + rand(-0.9, 0.9),
       mode,
       paletteMode,
@@ -1406,6 +1420,9 @@
       hp: maxHp,
       maxHp,
       seedCycleRate,
+      spawnTelegraphAge: 0,
+      spawnTelegraphLife: parent ? rand(0.20, 0.36) : rand(0.38, 0.62),
+      spawnTelegraphHue: fractaloidEffects.modeTelegraphHue(fractal.mode),
       fx: fractal.fx,
       fy: fractal.fy,
       baseFzoom,
@@ -1425,6 +1442,7 @@
   function spawnWave(w) {
     setWaveFractaloidClass(w);
     waveProfile = makeWaveProfile(w);
+    wavePace = computeAdaptiveWavePace(w);
     fractaloids = [];
     const isBossWave = w % BOSS_WAVE_INTERVAL === 0;
     if (isBossWave) {
@@ -1434,7 +1452,7 @@
           bossSpawn.x,
           bossSpawn.y,
           4,
-          w * 6,
+          w * 6 * wavePace.speedMul * rand(0.92, 1.16),
           null,
           null,
           {
@@ -1444,18 +1462,18 @@
           }
         )
       );
-      const escorts = Math.min(2 + Math.floor(w / 10), 4);
+      const escorts = Math.max(2, Math.min(Math.floor((2 + Math.floor(w / 10)) * wavePace.spawnMul * 0.72), 6));
       for (let i = 0; i < escorts; i++) {
         const p = edgeSpawnPoint(0);
-        fractaloids.push(makeFractaloid(p.x, p.y, 3, w * 4.5, null, null, { className: pickFractaloidClassForWaveSpawn(w) }));
+        fractaloids.push(makeFractaloid(p.x, p.y, 3, w * 4.5 * wavePace.speedMul * rand(0.9, 1.18), null, null, { className: pickFractaloidClassForWaveSpawn(w) }));
       }
       return;
     }
 
-    const count = Math.min(4 + w, 11);
+    const count = Math.max(4, Math.min(42, Math.floor((4 + w) * wavePace.spawnMul)));
     for (let i = 0; i < count; i++) {
       const p = edgeSpawnPoint(0);
-      fractaloids.push(makeFractaloid(p.x, p.y, 3, w * 4, null, null, { className: pickFractaloidClassForWaveSpawn(w) }));
+      fractaloids.push(makeFractaloid(p.x, p.y, 3, w * 4 * wavePace.speedMul * rand(0.9, 1.16), null, null, { className: pickFractaloidClassForWaveSpawn(w) }));
     }
   }
 
@@ -1467,7 +1485,7 @@
   function shouldDrawFractaloidPerimeter(a = null) {
     // Keep fallback renderer playable; polygon perimeter is optional with WebGL fractal shading.
     if (!fractalRenderer) return true;
-    if (FRACTALOID_PERIMETER_MKODE !== 'polygon') return false;
+    if (FRACTALOID_PERIMETER_MODE !== 'polygon') return false;
     if (fractaloidForcesPerimeter(a)) return true;
     return true;
   }
@@ -1505,9 +1523,11 @@
       if (perimeterOn) {
         for (const a of fractaloids) drawFractaloid(a);
       }
+      for (const a of fractaloids) fractaloidEffects.drawSpawnTelegraph(a, timeSec);
       return;
     }
     for (const a of fractaloids) drawFractaloid(a);
+    for (const a of fractaloids) fractaloidEffects.drawSpawnTelegraph(a, timeSec);
   }
 
   function updateFractaloid(a, dt) {
@@ -1531,7 +1551,130 @@
     const growthForCycle = Math.min(1, lifeT);
     const cycleBoost = a.isBoss ? (1.4 + hpT * 2.8 + growthForCycle * 1.7) : 1;
     a.fseed = fract(a.fseed + dt * a.seedCycleRate * cycleBoost);
+    a.spawnTelegraphAge += dt;
     wrap(a);
+  }
+
+  function clampDiveZoom(v) {
+    return clamp(v, FRACTAL_DIVE_MIN_ZOOM, FRACTAL_DIVE_MAX_ZOOM);
+  }
+
+  function randomizeFractalDiveTarget(target) {
+    if (!target) return;
+    const randomClass = FRACTALOID_CLASSES[Math.floor(Math.random() * FRACTALOID_CLASSES.length)] || 'tau';
+    const seeded = makeFractalSeed(Math.max(1, target.sizeKey || 1), !!target.isBoss, randomClass);
+    target.className = seeded.className || randomClass;
+    target.mode = seeded.mode;
+    target.paletteMode = seeded.paletteMode != null ? seeded.paletteMode : FRACTALOID_PALETTE_MODES.cosmic;
+    target.fx = seeded.fx;
+    target.fy = seeded.fy;
+    target.baseFzoom = seeded.fzoom;
+    target.fzoom = isJuliaMode(seeded.mode) ? seeded.fzoom * 1.08 : seeded.fzoom;
+    target.fseed = seeded.fseed;
+    target.frot = seeded.frot;
+    target.jx = seeded.jx;
+    target.jy = seeded.jy;
+    target.mZoomFloorRatio = seeded.mZoomFloorRatio != null ? seeded.mZoomFloorRatio : null;
+    target.spawnTelegraphHue = fractaloidEffects.modeTelegraphHue(seeded.mode);
+  }
+
+  function enterFractalDive(target, hitPoint = null, opts = null) {
+    if (!target) return;
+    const options = opts || {};
+    if (options.randomizeClass) randomizeFractalDiveTarget(target);
+    state = 'fractaldive';
+    const baseDisplayR = Math.max(target.r, target.baseR * 2.2);
+    const maxDisplayR = Math.min(Math.min(W, H) * 0.43, target.baseR * 4.8);
+    fractalDive = {
+      target,
+      hitPoint,
+      fx0: target.fx,
+      fy0: target.fy,
+      zoom: clampDiveZoom(target.fzoom * 0.92),
+      panX: 0,
+      panY: 0,
+      displayR: Math.max(baseDisplayR, maxDisplayR),
+      age: 0
+    };
+    target.vx = 0;
+    target.vy = 0;
+    target.spin = 0;
+  }
+
+  function maybeEnterFractalDive(target, hitPoint = null) {
+    if (!target) return false;
+    if (state !== 'playing') return false;
+    if (fractaloids.length !== 1 || fractaloids[0] !== target) return false;
+    if (target.hp > 1 || target.sizeKey !== 1) return false;
+    const manualTrigger = wave >= FRACTAL_DIVE_MIN_WAVE && keys.inspectMod && keys.fire;
+    const autoTrigger = wave >= FRACTAL_DIVE_AUTO_WAVE_INTERVAL && (wave % FRACTAL_DIVE_AUTO_WAVE_INTERVAL === 0);
+    if (!manualTrigger && !autoTrigger) return false;
+    enterFractalDive(target, hitPoint, { randomizeClass: autoTrigger && !manualTrigger });
+    return true;
+  }
+
+  function updateFractalDive(dt) {
+    if (!fractalDive || !fractalDive.target) return;
+    const d = fractalDive;
+    const a = d.target;
+    d.age += dt;
+    const centerEase = Math.min(1, dt * 5.5);
+    a.x += (W * 0.5 - a.x) * centerEase;
+    a.y += (H * 0.5 - a.y) * centerEase;
+    a.angle += dt * 0.08;
+    a.r += (d.displayR - a.r) * Math.min(1, dt * 3.5);
+    if (d.age < 1.2) {
+      d.zoom = clampDiveZoom(d.zoom * Math.pow(0.992, dt * 60));
+    }
+    a.fzoom = clampDiveZoom(d.zoom);
+    a.fx = d.fx0 + d.panX;
+    a.fy = d.fy0 + d.panY;
+    a.spawnTelegraphAge = a.spawnTelegraphLife;
+  }
+
+  function drawFractalDiveOverlay() {
+    ctx.save();
+    ctx.fillStyle = 'rgba(8, 14, 28, 0.72)';
+    ctx.fillRect(14, H - 108, Math.min(720, W - 28), 92);
+    ctx.strokeStyle = 'rgba(142, 190, 255, 0.55)';
+    ctx.strokeRect(14.5, H - 107.5, Math.min(720, W - 29), 91);
+    ctx.fillStyle = '#d7e9ff';
+    ctx.font = '16px "VT323", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText('Fractal Dive: arrows pan • Q/E zoom • wheel zoom • ESC return', 24, H - 98);
+    ctx.fillStyle = '#8ebdff';
+    ctx.fillText(`Auto every ${FRACTAL_DIVE_AUTO_WAVE_INTERVAL} waves (random class) • or Alt/Ctrl + Fire on final kill`, 24, H - 74);
+    ctx.restore();
+  }
+
+  function exitFractalDive() {
+    if (!fractalDive || !fractalDive.target) {
+      fractalDive = null;
+      state = 'playing';
+      return;
+    }
+    const a = fractalDive.target;
+    const idx = fractaloids.indexOf(a);
+    if (idx >= 0) fractaloids.splice(idx, 1);
+    spawnShockwave(a.x, a.y, a.r, a.fseed || 0);
+    awardFractaloidScore(FRACTALOID_SCORE[a.sizeKey]);
+    checkExtraLife();
+    sfx.bangSmall();
+    explode(a.x, a.y, 10, 0.75);
+    fractalDive = null;
+    if (fractaloids.length === 0) {
+      state = 'wavebreak';
+      stateTimer = 2.0;
+    } else {
+      state = 'playing';
+    }
+  }
+
+  function awardFractaloidScore(baseScore) {
+    const gained = funPack.award(baseScore);
+    score += gained;
+    return gained;
   }
 
   function damageFractaloid(a, hitPoint, grantScore) {
@@ -1551,7 +1694,7 @@
 
   function splitFractaloid(a, hitPoint = null, grantScore = true) {
     spawnShockwave(a.x, a.y, a.r, a.fseed || 0);
-    if (grantScore) score += FRACTALOID_SCORE[a.sizeKey];
+    if (grantScore) awardFractaloidScore(FRACTALOID_SCORE[a.sizeKey]);
     if (a.sizeKey === 4) {
       sfx.bangLarge();
       explode(a.x, a.y, 30, 1.9);
@@ -1872,6 +2015,10 @@
       for (let j = fractaloids.length - 1; j >= 0; j--) {
         const a = fractaloids[j];
         if (dist2(b, a) < a.r * a.r) {
+          if (maybeEnterFractalDive(a, b)) {
+            bullets.splice(i, 1);
+            break;
+          }
           bullets.splice(i, 1);
           const destroyed = damageFractaloid(a, b, true);
           if (destroyed) fractaloids.splice(j, 1);
@@ -1950,6 +2097,7 @@
   // GAME FLOW
   // ============================================================
   function startGame() {
+    if (bootBlocked) return;
     ensureAudio();
     score = 0;
     lives =9;
@@ -1960,9 +2108,14 @@
     fractaloids = [];
     particles = [];
     shockwaves = [];
+    fractalDive = null;
+    inputFeelSystem.reset();
     saucer = null;
     saucerBullets = [];
+    activeThreatCues = [];
     saucerTimer = rand(15, 25);
+    funPack.resetRun();
+    wavePace = { spawnMul: 1, speedMul: 1, saucerCadenceMul: 1 };
     ship = makeShip();
     state = 'playing';
     document.body.classList.add('playing');
@@ -1970,10 +2123,14 @@
     document.getElementById('gameover-screen').classList.add('hidden');
     document.getElementById('hud').classList.remove('hidden');
     spawnWave(wave);
+    saucerTimer = Math.max(8, rand(15, 25) / Math.max(0.68, wavePace.saucerCadenceMul || 1));
   }
 
   function endGame() {
     state = 'gameover';
+    fractalDive = null;
+    inputFeelSystem.reset();
+    activeThreatCues = [];
     document.body.classList.remove('playing');
     document.getElementById('final-score').textContent = 'SCORE: ' + score.toString().padStart(6, '0');
     document.getElementById('gameover-screen').classList.remove('hidden');
@@ -1994,6 +2151,7 @@
     }
   }
 
+  renderBootIssues();
   document.getElementById('start-btn').addEventListener('click', startGame);
   document.getElementById('start-btn').addEventListener('touchend', (e) => { e.preventDefault(); startGame(); });
   document.getElementById('restart-btn').addEventListener('click', startGame);
@@ -2010,7 +2168,8 @@
     const genomeLabel = waveProfile ? waveProfile.name.toUpperCase() : 'FRACTAL';
     const classLabel = fractaloidClassLabel(getFractaloidClass());
     const bossLabel = wave % BOSS_WAVE_INTERVAL === 0 ? ' • BOSS' : '';
-    document.getElementById('wave').textContent = 'WAVE ' + wave + ' • ' + classLabel + ' • ' + genomeLabel + bossLabel;
+    const chainLabel = funPack.getChainLabel();
+    document.getElementById('wave').textContent = 'WAVE ' + wave + ' • ' + classLabel + ' • ' + genomeLabel + bossLabel + chainLabel;
   }
 
   // ============================================================
@@ -2035,16 +2194,29 @@
   let totalTime = 0;
 
   function frame(now) {
+    if (!ctx) return;
     let dt = (now - lastTime) / 1000;
     if (dt > 0.05) dt = 0.05; // clamp
     lastTime = now;
     totalTime += dt;
+    funPack.tick(dt);
+    inputFeelSystem.tick(dt, { active: state === 'playing' && !!ship && ship.alive });
 
     // clear
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, W, H);
 
     drawStars(totalTime);
+
+    if (state === 'fractaldive') {
+      activeThreatCues = [];
+      updateFractalDive(dt);
+      drawFractaloids(totalTime, []);
+      drawFractalDiveOverlay();
+      updateHUD();
+      requestAnimationFrame(frame);
+      return;
+    }
 
     if (state === 'playing' || state === 'dying' || state === 'wavebreak') {
       // dynamic heartbeat: speeds up as waves escalate and danger increases
@@ -2071,7 +2243,8 @@
       saucerTimer -= dt;
       if (!saucer && saucerTimer <= 0 && state === 'playing') {
         spawnSaucer();
-        saucerTimer = rand(20, 35) - Math.min(wave * 1.5, 10);
+        const cadence = Math.max(0.68, wavePace.saucerCadenceMul || 1);
+        saucerTimer = Math.max(5, (rand(20, 35) / cadence) - Math.log2(Math.max(2, wave + 1)) * 1.2);
       }
       updateSaucer(dt);
 
@@ -2081,8 +2254,30 @@
 
       if (state === 'playing') checkCollisions();
 
+      if (state === 'playing' && ship && ship.alive && ship.invuln <= 0) {
+        activeThreatCues = threatCueSystem.compute({
+          ship,
+          fractaloids,
+          saucerBullets,
+          width: W,
+          height: H,
+          maxThreats: 2
+        });
+      } else {
+        activeThreatCues = [];
+      }
+
       // draw
       drawFractaloids(totalTime, saucerBullets);
+      if (state === 'playing' && ship && ship.alive) {
+        threatCueSystem.draw({
+          ship,
+          threats: activeThreatCues,
+          width: W,
+          height: H,
+          timeSec: totalTime
+        });
+      }
       drawShockwaves();
       drawSaucer();
       if (state === 'playing') drawShip(ship);
@@ -2126,6 +2321,7 @@
           if (lives <= 0) {
             endGame();
           } else {
+            funPack.triggerReliefForLives(lives);
             // wait for clear spawn area
             respawnShip();
             if (state === 'dying') stateTimer = 0.2; // try again shortly

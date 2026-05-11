@@ -144,12 +144,13 @@
     }
 
     const sfx = {
-      fire: () => beep(880, 0.08, 'square', 0.05),
+      //fire: () => beep(880, 0.08, 'square', 0.05),
+      fire: () => { sweepDown(666, 70, 0.25, 0.05); noise(0.05,0.04)},
       thrust: () => { if (!audioCtx) return; noise(0.05, 0.04); },
       bangLarge: () => { sweepDown(160, 40, 0.4, 0.15); noise(0.3, 0.12); },
       bangMedium: () => { sweepDown(220, 60, 0.3, 0.12); noise(0.2, 0.1); },
       bangSmall: () => { sweepDown(320, 100, 0.2, 0.1); noise(0.15, 0.08); },
-      death: () => { sweepDown(400, 50, 0.7, 0.18); noise(0.5, 0.15); },
+      death: () => { noise(0.5, 0.15); },
       hyper: () => {
         for (let i = 0; i < 6; i++) {
           setTimeout(() => beep(200 + Math.random() * 800, 0.05, 'sawtooth', 0.06), i * 30);

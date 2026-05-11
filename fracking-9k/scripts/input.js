@@ -10,7 +10,8 @@
       right: false,
       thrust: false,
       fire: false,
-      hyper: false
+      hyper: false,
+      inspectMod: false
     };
 
     let hyperPressed = false;
@@ -41,6 +42,12 @@
         if (!keys.hyper) hyperPressed = true;
         keys.hyper = true;
         e.preventDefault();
+      } else if (
+        e.code === 'AltLeft' || e.code === 'AltRight' ||
+        e.code === 'ControlLeft' || e.code === 'ControlRight'
+      ) {
+        keys.inspectMod = true;
+        e.preventDefault();
       } else if (e.code === 'Enter') {
         onStartRequested();
       }
@@ -52,6 +59,10 @@
       else if (e.code === 'ArrowUp' || e.code === 'KeyW') keys.thrust = false;
       else if (e.code === 'Space') keys.fire = false;
       else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.hyper = false;
+      else if (
+        e.code === 'AltLeft' || e.code === 'AltRight' ||
+        e.code === 'ControlLeft' || e.code === 'ControlRight'
+      ) keys.inspectMod = false;
     }
 
     function bindTouch(id, key, edgeHyper = false) {

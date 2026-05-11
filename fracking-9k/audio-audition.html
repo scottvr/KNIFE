@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FRACKING 9000 - Audio Audition</title>
+  <style>
+    :root {
+      --bg: #05070d;
+      --fg: #d8e5ff;
+      --muted: #8ea3cc;
+      --accent: #85f4ff;
+      --ok: #9bffb6;
+      --warn: #ffd67b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 20% 0%, #0b1330 0%, var(--bg) 40%, #020306 100%);
+      color: var(--fg);
+      font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+      padding: 20px;
+    }
+    .wrap {
+      max-width: 960px;
+      margin: 0 auto;
+      border: 1px solid #1f2d52;
+      background: rgba(5, 10, 22, 0.82);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.38);
+      padding: 16px;
+    }
+    .title {
+      color: var(--accent);
+      font-size: 20px;
+      margin: 0 0 8px;
+    }
+    .sub {
+      color: var(--muted);
+      margin: 0 0 12px;
+      font-size: 14px;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    button {
+      border: 1px solid #33538f;
+      color: var(--fg);
+      background: #0d1a3a;
+      padding: 8px 10px;
+      font: inherit;
+      cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); }
+    .menu {
+      white-space: pre;
+      border: 1px solid #1f2d52;
+      padding: 12px;
+      color: #d1dcf5;
+      background: #071126;
+      line-height: 1.4;
+      margin-bottom: 12px;
+      overflow-x: auto;
+    }
+    .status {
+      min-height: 42px;
+      border: 1px solid #1f2d52;
+      padding: 10px;
+      background: #070d1f;
+      color: var(--ok);
+    }
+    .status.warn { color: var(--warn); }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .row input[type="range"] { width: 220px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 class="title">FRACKING 9000 Audio Audition Utility</h1>
+    <p class="sub">Press keys or click controls. Open this file in a browser from project root.</p>
+
+    <div class="controls">
+      <button id="btn-enable">Enable Audio</button>
+      <button id="btn-all">Play All</button>
+      <button id="btn-heartbeat">Heartbeat Pulse</button>
+      <button id="btn-heartbeat-loop">Start Heartbeat Loop</button>
+      <button id="btn-stop-loop">Stop Heartbeat Loop</button>
+    </div>
+
+    <div class="row">
+      <span>Heartbeat Hz:</span>
+      <input id="heartbeat-hz" type="range" min="60" max="140" step="1" value="92">
+      <span id="heartbeat-hz-label">92 Hz</span>
+    </div>
+
+    <div class="menu" id="menu"></div>
+    <div class="status warn" id="status">Audio locked until user gesture. Press "Enable Audio".</div>
+  </div>
+
+  <script src="./scripts/audio.js"></script>
+  <script>
+    (() => {
+      'use strict';
+
+      const menuEl = document.getElementById('menu');
+      const statusEl = document.getElementById('status');
+      const hzSlider = document.getElementById('heartbeat-hz');
+      const hzLabel = document.getElementById('heartbeat-hz-label');
+
+      const audioSystem = (window.FrackingAudio && typeof window.FrackingAudio.create === 'function')
+        ? window.FrackingAudio.create()
+        : null;
+
+      if (!audioSystem) {
+        statusEl.className = 'status warn';
+        statusEl.textContent = 'FrackingAudio module not found. Make sure ./scripts/audio.js is present.';
+        return;
+      }
+
+      const sfx = audioSystem.sfx;
+      let heartbeatTimer = null;
+
+      const actions = [
+        { key: '1', label: 'fire', fn: () => sfx.fire() },
+        { key: '2', label: 'thrust', fn: () => sfx.thrust() },
+        { key: '3', label: 'bangLarge', fn: () => sfx.bangLarge() },
+        { key: '4', label: 'bangMedium', fn: () => sfx.bangMedium() },
+        { key: '5', label: 'bangSmall', fn: () => sfx.bangSmall() },
+        { key: '6', label: 'death', fn: () => sfx.death() },
+        { key: '7', label: 'hyper', fn: () => sfx.hyper() },
+        { key: '8', label: 'saucerFire', fn: () => sfx.saucerFire() },
+        { key: '9', label: 'extraLife', fn: () => sfx.extraLife() },
+        { key: 'h', label: 'heartbeatPulse', fn: () => playHeartbeatPulse() },
+        { key: '0', label: 'playAllSequence', fn: () => playAll() }
+      ];
+
+      function setStatus(msg, warn = false) {
+        statusEl.className = warn ? 'status warn' : 'status';
+        statusEl.textContent = msg;
+      }
+
+      function updateMenu() {
+        const lines = [
+          'KEY  ACTION',
+          '---  ------------------------------------',
+          ...actions.map((a) => `${a.key.padEnd(3, ' ')}  ${a.label}`),
+          '',
+          'L    toggle heartbeat loop',
+          'ESC  stop heartbeat loop',
+          '',
+          'Tip: for TODO comparisons, repeatedly tap 3/4/5/6/8 then 0.'
+        ];
+        menuEl.textContent = lines.join('\n');
+      }
+
+      function enableAudio() {
+        audioSystem.ensureAudio();
+        setStatus('Audio enabled. Trigger sounds with keys or buttons.');
+      }
+
+      function heartbeatHz() {
+        return Number(hzSlider.value || 92);
+      }
+
+      function playHeartbeatPulse() {
+        audioSystem.ensureAudio();
+        audioSystem.heartbeatPulse(heartbeatHz());
+        setStatus(`Played heartbeat pulse at ${heartbeatHz()} Hz`);
+      }
+
+      function startHeartbeatLoop() {
+        if (heartbeatTimer) return;
+        audioSystem.ensureAudio();
+        heartbeatTimer = setInterval(() => {
+          audioSystem.heartbeatPulse(heartbeatHz(), {
+            level: 0.052,
+            pulseSec: 0.102,
+            attackSec: 0.0012,
+            decaySec: 0.061
+          });
+        }, 650);
+        setStatus('Heartbeat loop started.');
+      }
+
+      function stopHeartbeatLoop() {
+        if (!heartbeatTimer) return;
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+        setStatus('Heartbeat loop stopped.');
+      }
+
+      function playAll() {
+        audioSystem.ensureAudio();
+        const seq = [
+          () => sfx.fire(),
+          () => sfx.thrust(),
+          () => sfx.bangSmall(),
+          () => sfx.bangMedium(),
+          () => sfx.bangLarge(),
+          () => sfx.saucerFire(),
+          () => sfx.hyper(),
+          () => sfx.death(),
+          () => sfx.extraLife()
+        ];
+        seq.forEach((fn, i) => setTimeout(fn, i * 260));
+        setStatus('Playing all SFX sequence.');
+      }
+
+      function handleKey(e) {
+        const key = String(e.key || '').toLowerCase();
+        if (key === 'escape') {
+          stopHeartbeatLoop();
+          return;
+        }
+        if (key === 'l') {
+          if (heartbeatTimer) stopHeartbeatLoop();
+          else startHeartbeatLoop();
+          return;
+        }
+        const action = actions.find((a) => a.key === key);
+        if (!action) return;
+        e.preventDefault();
+        audioSystem.ensureAudio();
+        action.fn();
+        setStatus(`Played ${action.label}`);
+      }
+
+      document.getElementById('btn-enable').addEventListener('click', enableAudio);
+      document.getElementById('btn-all').addEventListener('click', playAll);
+      document.getElementById('btn-heartbeat').addEventListener('click', playHeartbeatPulse);
+      document.getElementById('btn-heartbeat-loop').addEventListener('click', startHeartbeatLoop);
+      document.getElementById('btn-stop-loop').addEventListener('click', stopHeartbeatLoop);
+      hzSlider.addEventListener('input', () => {
+        hzLabel.textContent = `${heartbeatHz()} Hz`;
+      });
+      window.addEventListener('keydown', handleKey);
+
+      updateMenu();
+    })();
+  </script>
+</body>
+</html>
