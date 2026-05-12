@@ -36,6 +36,8 @@ Tiny coyote-time for fire/thrust taps and slightly buffered hyperspace input. Ma
 11. [x] Small sound fx pass
 get rid of high pitched ding that seems to be playing along with the heartbeat. I don't know when or how it got in. take the "pew" sound out of the explosion fx, leaving the percussive noise only for eplosions, and replacing the current missile firingn sound with the "pew" sound, make the pew sound a bit higher pitched.
 
+12. [ ] diminishing threat cues
+as levels progressm and the raate is accelrateing to make things more challenging, the threat cues should probably become shorter on top of already perhap sbeing shorter due to rate acceleratings. That is, they come later/distance to warn of hazard becomes shorter, radius is smaller, and so on.
 
 ## Always
 - prefer separating concerns

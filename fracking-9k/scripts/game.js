@@ -28,6 +28,9 @@
   if (!(window.FrackingFunPack && typeof window.FrackingFunPack.create === 'function')) {
     noteBootWarning('Fun pack module missing; adaptive pacing/combo simplified.');
   }
+  if (!(window.FrackingFractaloidClasses && typeof window.FrackingFractaloidClasses.create === 'function')) {
+    noteBootCritical('Fractaloid classes module missing; class catalog unavailable.');
+  }
   if (!(window.FrackingInputFeel && typeof window.FrackingInputFeel.create === 'function')) {
     noteBootWarning('Input-feel module missing; using direct input without tap grace/buffer.');
   }
@@ -256,6 +259,7 @@
   let waveProfile = null;
   let activeFractaloidClass = 'mandelbrot';
   let fractalDive = null;
+  let deathLifeSpent = false;
   const funPack = (window.FrackingFunPack && typeof window.FrackingFunPack.create === 'function')
     ? window.FrackingFunPack.create()
     : {
@@ -293,123 +297,36 @@
   const FIRE_COOLDOWN_BASE = 0.04;
   const FIRE_PATTERN = [2, 2,  4, 2, 2, 4, 8, 4, 2];
   const SHIP_FRACTAL_CLASS = 'mandelbrot_outline'; // 'sierpinski' | 'mandelbrot_outline'
-  const FRACTALOID_CLASS = 'cycle'; // 'cycle' | 'tau' | 'magnet' | 'buffalo' | 'tricorn' | 'julia' | 'mande
   const SHIP_FRACTAL_CLASSES = ['sierpinski', 'mandelbrot_outline'];
-  const FRACTALOID_CLASSES = ['tau', 'magnet', 'buffalo', 'tricorn', 'julia', 'mandelbrot'];
-  const FRACTALOID_CLASS_SEQUENCE = [ 'mandelbrot', 'magnet', 'julia', 'buffalo', 'tricorn', 'julia', 'mandelbrot', 'tau'];
+  const FRACTALOID_CLASS = 'cycle'; // 'cycle' | 'tau' | 'magnet' | 'buffalo' | 'tricorn' | 'julia' | 'mandelbrot'
   const FRACTALOID_MIX_AFTER_CYCLE = true;
-  const FRACTAL_DIVE_AUTO_WAVE_INTERVAL = Math.max(1, FRACTALOID_CLASS_SEQUENCE.length);
-  const FRACTALOID_CLASS_MODES = {
-    tau: 0,
-    julia: 1,
-    magnet: 2,
-    buffalo: 3,
-    tricorn: 4,
-    mandelbrot: 5 // compatibility alias
-  };
-  const FRACTALOID_MODE_NAMES = {
-    0: 'tau',
-    1: 'julia',
-    2: 'magnet',
-    3: 'buffalo',
-    4: 'tricorn',
-    5: 'mandelbrot'
-  };
-  const FRACTALOID_CLASS_SPECS = {
-    mandelbrot: {
-      mode: FRACTALOID_CLASS_MODES.mandelbrot,
-      label: 'MANDELBROT',
-      focusX: -0.450,
-      focusY: 0.003,
-      zoomBase: 1.02,
-      zoomVariance: 0.52,
-      zoomMin: 1.0,
-      zoomMax: 2.5,
-      spreadMul: 0.94,
-      waveZoomMul: 0.8,
-      childZoomMin: 0.62,
-      childZoomMax: 0.92,
-      childTangent: 0.31
-    },
-    tau: {
-      mode: FRACTALOID_CLASS_MODES.tau,
-      label: 'TAU BROT',
-      focusX: -0.222,
-      focusY: 0.003,
-      zoomBase: 0.92,
-      zoomVariance: 0.52,
-      zoomMin: 0.38,
-      zoomMax: 2.35,
-      spreadMul: 0.94,
-      waveZoomMul: 0.58,
-      childZoomMin: 0.62,
-      childZoomMax: 0.82,
-      childTangent: 0.21
-    },
-    julia: {
-      mode: FRACTALOID_CLASS_MODES.julia,
-      label: 'JULIA',
-      focusX: -0.7445,
-      focusY: 0.1318,
-      zoomBase: 2.0,
-      zoomVariance: 0.56,
-      zoomMin: 1.5,
-      zoomMax: 2.5,
-      spreadMul: 1.0,
-      waveZoomMul: 0.52,
-      childZoomMin: 0.74,
-      childZoomMax: 0.92,
-      childTangent: 0.11
-    },
-    magnet: {
-      mode: FRACTALOID_CLASS_MODES.magnet,
-      label: 'MAGNET',
-      focusX: .5,
-      focusY: 0.0,
-      zoomBase: 1.0,
-      zoomVariance: 0.38,
-      zoomMin: 0.6,
-      zoomMax: 1.7,
-      spreadMul: 0.58,
-      waveZoomMul: 0.56,
-      childZoomMin: 0.64,
-      childZoomMax: 0.86,
-      childTangent: 0.18
-    },
-    buffalo: {
-      mode: FRACTALOID_CLASS_MODES.buffalo,
-      label: 'BUFFALO',
-      focusX: -1.813978835021709,
-      focusY: -0.18926374819102731,
-      zoomBase: 1 / 10.7,
-      zoomVariance: 0.034,
-      zoomMin: 0.026,
-      zoomMax: 0.24,
-      spreadMul: 0.42,
-      waveZoomMul: 0.36,
-      childZoomMin: 0.68,
-      childZoomMax: 0.9,
-      childTangent: 0.16
-    },
-    tricorn: {
-      mode: FRACTALOID_CLASS_MODES.tricorn,
-      label: 'TRICORN',
-      focusX: -0.485,
-      focusY: 0.0,
-      zoomBase: 1.04,
-      zoomVariance: 0.56,
-      zoomMin: 0.34,
-      zoomMax: 2.2,
-      spreadMul: 0.84,
-      waveZoomMul: 0.6,
-      childZoomMin: 0.6,
-      childZoomMax: 0.84,
-      childTangent: 0.2
-    }
-  };
+  const fractaloidClassSystem = (window.FrackingFractaloidClasses && typeof window.FrackingFractaloidClasses.create === 'function')
+    ? window.FrackingFractaloidClasses.create({
+        selectedClass: FRACTALOID_CLASS,
+        mixAfterCycle: FRACTALOID_MIX_AFTER_CYCLE
+      })
+    : {
+        classModes: { tau: 0, julia: 1, magnet: 2, buffalo: 3, tricorn: 4, mandelbrot: 5 },
+        classes: ['tau'],
+        classSequence: ['tau'],
+        autoDiveWaveInterval: 1,
+        getClassSequence: () => ['tau'],
+        getClassByMode: () => 'tau',
+        getClassSpec: () => ({ mode: 0, label: 'TAU BROT' }),
+        isJuliaMode: () => false,
+        hasCompletedCycle: () => false,
+        isMixedWave: () => false,
+        resolveClassForWave: () => 'tau',
+        pickClassForWaveSpawn: () => 'tau',
+        classLabel: () => 'TAU BROT'
+      };
+  const FRACTALOID_CLASSES = fractaloidClassSystem.classes;
+  const FRACTALOID_CLASS_SEQUENCE = fractaloidClassSystem.classSequence;
+  const FRACTALOID_CLASS_MODES = fractaloidClassSystem.classModes;
+  const FRACTAL_DIVE_AUTO_WAVE_INTERVAL = fractaloidClassSystem.autoDiveWaveInterval;
   const FRACTALOID_PALETTE_MODES = { cosmic: 0, ember: 1, firefly: 2, gold: 3, plasma: 4 };
   const FRACTALOID_PERIMETER_MODE = 'none'; // 'none' | 'polygon'
-  const FRACTALOID_CHROMA_TWEAK = 1.0; // 0..1, set to 0 to disable chroma/luma rescue boosts
+  const FRACTALOID_CHROMA_TWEAK = 0.5; // 0..1, set to 0 to disable chroma/luma rescue boosts
   const FRACTALOID_NEON_TWEAK = 0.01; // 0..1, set to 0 for flatter/older look
   const SAUCER_FRACTAL_CLASS = 'cycle'; // 'cycle' | 'classic' | 'sierpinski' | 'koch'
   const SAUCER_FRACTAL_CLASSES = ['classic', 'sierpinski', 'koch'];
@@ -871,48 +788,31 @@
   }
 
   function getFractaloidClassSequence() {
-    const seq = FRACTALOID_CLASS_SEQUENCE.filter((name) => FRACTALOID_CLASSES.includes(name));
-    return seq.length ? seq : ['tau'];
+    return fractaloidClassSystem.getClassSequence();
   }
 
   function getFractaloidClassByMode(mode) {
-    return FRACTALOID_MODE_NAMES[mode] || 'tau';
+    return fractaloidClassSystem.getClassByMode(mode);
   }
 
   function getFractaloidClassSpec(className) {
-    const key = FRACTALOID_CLASS_SPECS[className] ? className : 'tau';
-    return FRACTALOID_CLASS_SPECS[key] || FRACTALOID_CLASS_SPECS.tau;
+    return fractaloidClassSystem.getClassSpec(className);
   }
 
   function isJuliaMode(mode) {
-    return mode === FRACTALOID_CLASS_MODES.julia;
+    return fractaloidClassSystem.isJuliaMode(mode);
   }
 
   function hasCompletedFractaloidCycle(w) {
-    if (!FRACTALOID_MIX_AFTER_CYCLE || FRACTALOID_CLASS !== 'cycle') return false;
-    const seq = getFractaloidClassSequence();
-    if (!seq.length) return false;
-    const required = new Set(FRACTALOID_CLASSES);
-    const seen = new Set();
-    const wavesElapsed = Math.max(0, Math.floor(w) - 1);
-    for (let i = 0; i < wavesElapsed; i++) {
-      seen.add(seq[i % seq.length]);
-    }
-    for (const className of required) {
-      if (!seen.has(className)) return false;
-    }
-    return true;
+    return fractaloidClassSystem.hasCompletedCycle(w);
   }
 
   function isMixedFractaloidWave(w) {
-    return hasCompletedFractaloidCycle(w);
+    return fractaloidClassSystem.isMixedWave(w);
   }
 
   function resolveFractaloidClassForWave(w) {
-    if (FRACTALOID_CLASSES.includes(FRACTALOID_CLASS)) return FRACTALOID_CLASS;
-    if (isMixedFractaloidWave(w)) return 'mixed';
-    const seq = getFractaloidClassSequence();
-    return seq[(Math.max(1, w) - 1) % seq.length];
+    return fractaloidClassSystem.resolveClassForWave(w);
   }
 
   function setWaveFractaloidClass(w) {
@@ -934,17 +834,11 @@
   }
 
   function fractaloidClassLabel(className) {
-    if (className === 'mixed') return 'MIXED';
-    const spec = getFractaloidClassSpec(className);
-    return spec.label || 'FRACTAL';
+    return fractaloidClassSystem.classLabel(className);
   }
 
   function pickFractaloidClassForWaveSpawn(w) {
-    if (!isMixedFractaloidWave(w)) return resolveFractaloidClassForWave(w);
-    const seq = getFractaloidClassSequence();
-    const anchorClass = seq[(Math.max(1, w) - 1) % seq.length];
-    if (Math.random() < 0.45) return anchorClass;
-    return FRACTALOID_CLASSES[Math.floor(Math.random() * FRACTALOID_CLASSES.length)];
+    return fractaloidClassSystem.pickClassForWaveSpawn(w);
   }
 
   function pickJuliaConstant(profile, sizeKey, seedBias = 0) {
@@ -1199,6 +1093,7 @@
   function killShip() {
     if (!ship.alive || ship.invuln > 0) return;
     ship.alive = false;
+    deathLifeSpent = false;
     funPack.resetChain();
     explode(ship.x, ship.y, 24, 1.5);
     sfx.death();
@@ -2109,6 +2004,7 @@
     particles = [];
     shockwaves = [];
     fractalDive = null;
+    deathLifeSpent = false;
     inputFeelSystem.reset();
     saucer = null;
     saucerBullets = [];
@@ -2129,6 +2025,7 @@
   function endGame() {
     state = 'gameover';
     fractalDive = null;
+    deathLifeSpent = false;
     inputFeelSystem.reset();
     activeThreatCues = [];
     document.body.classList.remove('playing');
@@ -2145,6 +2042,15 @@
       if (dist2(center, a) < (a.r + center.r) * (a.r + center.r)) { clear = false; break; }
     }
     if (saucer && dist2(center, saucer) < (saucer.r + center.r) * (saucer.r + center.r)) clear = false;
+    if (clear) {
+      for (const b of saucerBullets) {
+        const br = b.r || 2;
+        if (dist2(center, b) < (center.r + br) * (center.r + br)) {
+          clear = false;
+          break;
+        }
+      }
+    }
     if (clear) {
       ship = makeShip();
       state = 'playing';
@@ -2317,14 +2223,21 @@
       if (state === 'dying') {
         stateTimer -= dt;
         if (stateTimer <= 0) {
-          lives--;
-          if (lives <= 0) {
-            endGame();
-          } else {
-            funPack.triggerReliefForLives(lives);
-            // wait for clear spawn area
+          if (!deathLifeSpent) {
+            lives--;
+            deathLifeSpent = true;
+            if (lives <= 0) {
+              endGame();
+            }
+            else {
+              funPack.triggerReliefForLives(lives);
+            }
+          }
+          if (state === 'dying') {
+            // wait for clear spawn area; do not spend extra lives while waiting
             respawnShip();
             if (state === 'dying') stateTimer = 0.2; // try again shortly
+            else deathLifeSpent = false;
           }
         }
       }
