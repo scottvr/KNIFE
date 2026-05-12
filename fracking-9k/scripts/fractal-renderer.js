@@ -131,12 +131,27 @@ function createFractalRenderer(glCtx) {
       );
     }
 
+    vec3 applyCrtBlackFloor(vec3 color) {
+      float floorLuma = dot(u_crtBlack, vec3(0.2126, 0.7152, 0.0722));
+      float colorLuma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+      if (colorLuma >= floorLuma) return color;
+
+      // Preserve hue for very dark colors when possible; otherwise fall back to
+      // the neutral CRT floor tint to avoid hard #000 islands.
+      float hueWeight = smoothstep(0.0012, floorLuma * 0.95, colorLuma);
+      vec3 hueLifted = color * (floorLuma / max(0.00001, colorLuma));
+      vec3 lifted = mix(u_crtBlack, hueLifted, hueWeight);
+      return clamp(lifted, vec3(0.0), vec3(1.0));
+    }
+
     vec3 paletteByMode(float t, float seed, float cycle, float mode) {
-      if (mode < 0.5) return paletteCosmic(t, seed, cycle);
-      if (mode < 1.5) return paletteEmber(t, seed, cycle);
-      if (mode < 2.5) return paletteFirefly(t, seed, cycle);
-      if (mode < 3.5) return paletteGold(t, seed, cycle);
-      return palettePlasma(t, seed, cycle);
+      vec3 c = vec3(0.0);
+      if (mode < 0.5) c = paletteCosmic(t, seed, cycle);
+      else if (mode < 1.5) c = paletteEmber(t, seed, cycle);
+      else if (mode < 2.5) c = paletteFirefly(t, seed, cycle);
+      else if (mode < 3.5) c = paletteGold(t, seed, cycle);
+      else c = palettePlasma(t, seed, cycle);
+      return applyCrtBlackFloor(c);
     }
 
     float paletteCoordForMode(float tNorm, float mode) {
