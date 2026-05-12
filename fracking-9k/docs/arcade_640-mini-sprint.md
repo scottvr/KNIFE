@@ -61,8 +61,11 @@ Ship a selectable `arcade_640` mode that:
    - In `arcade_640`, set internal canvas pixel dimensions directly to fixed 4:3 preset dimensions.
    - Presets available via query param:
      - `?mode=arcade_640&arcadeRes=640x480`
+     - `?mode=arcade_640&arcadeRes=480x640`
      - `?mode=arcade_640&arcadeRes=1024x768`
+     - `?mode=arcade_640&arcadeRes=768x1024`
      - `?mode=arcade_640&arcadeRes=1280x960`
+     - `?mode=arcade_640&arcadeRes=960x1280`
    - Do not multiply internal buffer by device DPR in this mode.
    - Apply same sizing policy to both `#game` and `#fractal-layer`.
    - Done when:

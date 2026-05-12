@@ -66,6 +66,21 @@
 
   const urlParams = new URLSearchParams(window.location.search);
   const perfOverlayEnabledByQuery = urlParams.get('perf') === '1' || urlParams.get('perfOverlay') === '1';
+  const maxFpsQueryRaw = (urlParams.get('max_fps') || urlParams.get('maxFps') || '').trim();
+  const maxFpsParsed = Number(maxFpsQueryRaw);
+  const MAX_FPS = (() => {
+    if (!maxFpsQueryRaw) return 0; // default: uncapped (display vsync)
+    if (!Number.isFinite(maxFpsParsed) || maxFpsParsed <= 0) {
+      console.warn(`[Render mode] Invalid maxFps "${maxFpsQueryRaw}". Using uncapped frame pacing.`);
+      return 0;
+    }
+    const clamped = Math.max(1, Math.min(240, maxFpsParsed));
+    if (clamped !== maxFpsParsed) {
+      console.warn(`[Render mode] maxFps "${maxFpsParsed}" clamped to "${clamped}".`);
+    }
+    return clamped;
+  })();
+  const MAX_FPS_FRAME_MS = MAX_FPS > 0 ? (1000 / MAX_FPS) : 0;
 
   // ============================================================
   // RENDER MODES (Task 1 scaffolding)
@@ -79,8 +94,11 @@
   }
   const ARCADE_RES_PRESETS = {
     '640x480': { w: 640, h: 480 },
+    '480x640': { w: 480, h: 640 },
     '1024x768': { w: 1024, h: 768 },
-    '1280x960': { w: 1280, h: 960 }
+    '768x1024': { w: 768, h: 1024 },
+    '1280x960': { w: 1280, h: 960 },
+    '960x1280': { w: 960, h: 1280 }
   };
   const ARCADE_RES_DEFAULT = '1024x768';
   const arcadeResQueryRaw = (urlParams.get('arcade_res') || urlParams.get('arcadeRes') || '').trim().toLowerCase();
@@ -99,6 +117,35 @@
     const root = window.getComputedStyle(document.documentElement);
     const cssColor = (root.getPropertyValue('--crt-black') || '').trim();
     return cssColor || '#090e14';
+  })();
+  const CRT_CLEAR_RGB = (() => {
+    const c = CRT_CLEAR_COLOR.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(c)) {
+      return [
+        parseInt(c.slice(1, 3), 16) / 255,
+        parseInt(c.slice(3, 5), 16) / 255,
+        parseInt(c.slice(5, 7), 16) / 255
+      ];
+    }
+    if (/^#[0-9a-fA-F]{3}$/.test(c)) {
+      return [
+        parseInt(c[1] + c[1], 16) / 255,
+        parseInt(c[2] + c[2], 16) / 255,
+        parseInt(c[3] + c[3], 16) / 255
+      ];
+    }
+    const rgbMatch = c.match(/^rgba?\(([^)]+)\)$/i);
+    if (rgbMatch) {
+      const parts = rgbMatch[1].split(',').map((v) => Number(v.trim()));
+      if (parts.length >= 3 && parts.every((v, i) => i >= 3 || Number.isFinite(v))) {
+        return [
+          Math.max(0, Math.min(255, parts[0])) / 255,
+          Math.max(0, Math.min(255, parts[1])) / 255,
+          Math.max(0, Math.min(255, parts[2])) / 255
+        ];
+      }
+    }
+    return [0.0352941176, 0.0549019608, 0.0784313725];
   })();
   const VECTOR_GLOW_TIERS = {
     high: {
@@ -138,6 +185,9 @@
     document.body.classList.add('mobile');
     document.getElementById('desktop-instr').classList.add('hidden');
     document.getElementById('mobile-instr').classList.remove('hidden');
+  }
+  if (fractalRenderer && typeof fractalRenderer.setCrtBlack === 'function') {
+    fractalRenderer.setCrtBlack(CRT_CLEAR_RGB);
   }
 
   function renderBootIssues() {
@@ -385,7 +435,8 @@
           world: `${W}x${H}`,
           displayScale: DISPLAY_SCALE,
           render: `${canvas ? canvas.width : 0}x${canvas ? canvas.height : 0}`,
-          dpr: DPR
+          dpr: DPR,
+          maxFps: MAX_FPS > 0 ? MAX_FPS : 'uncapped'
         })
       })
     : {
@@ -1860,7 +1911,8 @@
       displayScale: DISPLAY_SCALE,
       renderWidth: canvas ? canvas.width : 0,
       renderHeight: canvas ? canvas.height : 0,
-      dpr: DPR
+      dpr: DPR,
+      maxFps: MAX_FPS > 0 ? MAX_FPS : 0
     };
   }
 
@@ -1868,10 +1920,26 @@
   // MAIN LOOP
   // ============================================================
   let lastTime = performance.now();
+  let lastRafTime = lastTime;
+  let cappedFrameCarryMs = 0;
   let totalTime = 0;
 
   function frame(now) {
     if (!ctx) return;
+    if (MAX_FPS_FRAME_MS > 0) {
+      const rafDelta = Math.max(0, now - lastRafTime);
+      lastRafTime = now;
+      cappedFrameCarryMs += rafDelta;
+      if (cappedFrameCarryMs < MAX_FPS_FRAME_MS) {
+        requestAnimationFrame(frame);
+        return;
+      }
+      // Preserve remainder so fractional caps (e.g. 59.94) stay accurate over time.
+      cappedFrameCarryMs %= MAX_FPS_FRAME_MS;
+    } else {
+      lastRafTime = now;
+    }
+
     const perfFrame = perfMetrics.beginFrame(now);
     let dt = (now - lastTime) / 1000;
     if (dt > 0.05) dt = 0.05; // clamp

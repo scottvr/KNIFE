@@ -73,6 +73,7 @@ function createFractalRenderer(glCtx) {
     uniform float u_diveMode;
     uniform float u_colorEnhance;
     uniform float u_liftMixOn;
+    uniform vec3 u_crtBlack;
     out vec4 outColor;
 
     vec3 paletteCosmic(float t, float seed, float cycle) {
@@ -439,7 +440,7 @@ function createFractalRenderer(glCtx) {
       float trapTone = clamp(trapCrossTone * 0.65 + trapCircleTone * 0.35, 0.0, 1.0);
       vec3 insideBase = enhanceColor
         ? (isMagnet ? vec3(0.015, 0.02, 0.03) : vec3(0.09, 0.11, 0.15))
-        : (isJulia ? vec3(0.012, 0.012, 0.018) : vec3(0.0, 0.0, 0.0));
+        : (isJulia ? vec3(0.012, 0.012, 0.018) : u_crtBlack);
       float insideAccentMode = (!enhanceColor && isJulia)
         ? v_paletteMode
         : mod(v_paletteMode + 0.5, 5.0);
@@ -629,15 +630,28 @@ function createFractalRenderer(glCtx) {
   const uDiveMode = glCtx.getUniformLocation(program, 'u_diveMode');
   const uColorEnhance = glCtx.getUniformLocation(program, 'u_colorEnhance');
   const uLiftMixOn = glCtx.getUniformLocation(program, 'u_liftMixOn');
+  const uCrtBlack = glCtx.getUniformLocation(program, 'u_crtBlack');
 
   const data = new Float32Array(maxInstances * floatsPerInstance);
   const warpData = new Float32Array(maxWarpBullets * 3);
+  const crtBlack = new Float32Array([0.0352941176, 0.0549019608, 0.0784313725]);
   let viewportW = 0;
   let viewportH = 0;
 
   function resize(pixelW, pixelH) {
     viewportW = pixelW;
     viewportH = pixelH;
+  }
+
+  function setCrtBlack(rgb) {
+    if (!rgb || rgb.length < 3) return;
+    const r = Number(rgb[0]);
+    const g = Number(rgb[1]);
+    const b = Number(rgb[2]);
+    if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) return;
+    crtBlack[0] = Math.max(0, Math.min(1, r));
+    crtBlack[1] = Math.max(0, Math.min(1, g));
+    crtBlack[2] = Math.max(0, Math.min(1, b));
   }
 
   function render(list, timeSec, dpr, warpBullets = [], options = null) {
@@ -702,6 +716,7 @@ function createFractalRenderer(glCtx) {
     glCtx.uniform1f(uDiveMode, diveMode);
     glCtx.uniform1f(uColorEnhance, colorEnhance);
     glCtx.uniform1f(uLiftMixOn, liftMixOn);
+    glCtx.uniform3fv(uCrtBlack, crtBlack);
     glCtx.bindVertexArray(vao);
     glCtx.bindBuffer(glCtx.ARRAY_BUFFER, instances);
     glCtx.bufferSubData(glCtx.ARRAY_BUFFER, 0, data.subarray(0, count * floatsPerInstance));
@@ -709,7 +724,7 @@ function createFractalRenderer(glCtx) {
     glCtx.bindVertexArray(null);
   }
 
-  return { resize, render };
+  return { resize, render, setCrtBlack };
 }
 
   window.FrackingFractalRenderer = {
