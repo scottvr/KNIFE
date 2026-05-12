@@ -70,14 +70,16 @@ function createFractalRenderer(glCtx) {
     uniform float u_perimeterOn;
     uniform float u_chromaTweak;
     uniform float u_neonTweak;
+    uniform float u_diveMode;
+    uniform float u_colorEnhance;
+    uniform float u_liftMixOn;
     out vec4 outColor;
 
     vec3 paletteCosmic(float t, float seed, float cycle) {
-      float phase = seed * 6.28318;
       return vec3(
-        0.5 + 0.5 * cos(3.0 + t + cycle * 0.5 + phase * 0.31),
-        0.5 + 0.5 * cos(3.0 + t * 0.7 + cycle * 0.3 + phase * 0.19),
-        0.5 + 0.5 * cos(3.0 + t * 0.5 + cycle * 0.2 + phase * 0.11)
+        0.5 + 0.5 * cos(3.0 + t + cycle * 0.5),
+        0.5 + 0.5 * cos(3.0 + t * 0.7 + cycle * 0.3),
+        0.5 + 0.5 * cos(3.0 + t * 0.5 + cycle * 0.2)
       );
     }
 
@@ -87,7 +89,7 @@ function createFractalRenderer(glCtx) {
       vec3 c2 = vec3(0.600, 0.080, 0.000);
       vec3 c3 = vec3(1.000, 0.420, 0.060);
       vec3 c4 = vec3(1.000, 0.900, 0.350);
-      float q = fract(t + cycle * 0.05 + seed * 0.37);
+      float q = fract(t + cycle * 0.05);
       if (q < 0.22) return mix(c0, c1, q / 0.22);
       if (q < 0.50) return mix(c1, c2, (q - 0.22) / 0.28);
       if (q < 0.78) return mix(c2, c3, (q - 0.50) / 0.28);
@@ -95,18 +97,18 @@ function createFractalRenderer(glCtx) {
     }
 
     vec3 paletteFirefly(float t, float seed, float cycle) {
-      float p = (t + seed * 0.11) * 6.28318 + cycle * 1.1;
+      float p = t * 6.28318 + cycle * 1.1;
       float g = pow(0.5 + 0.5 * sin(p + 0.7), 2.5);
       return vec3(
         0.02 + 0.18 * g,
         0.08 + 0.55 * g,
-        0.01 + 0.10 * sin(p * 0.6 + 2.0 + seed * 4.0)
+        0.01 + 0.10 * sin(p * 0.6 + 2.0)
       );
     }
 
     vec3 paletteGold(float t, float seed, float cycle) {
-      float sn = max(t + seed * 0.06, 0.000001);
-      float q = fract(pow(sn, 0.35) * 0.15 + cycle * 0.02 + seed * 0.28);
+      float sn = max(t, 0.000001);
+      float q = fract(pow(sn, 0.35) * 0.15 + cycle * 0.02);
       vec3 c0 = vec3(0.000, 0.027, 0.392);
       vec3 c1 = vec3(0.125, 0.420, 0.796);
       vec3 c2 = vec3(0.929, 1.000, 1.000);
@@ -120,7 +122,7 @@ function createFractalRenderer(glCtx) {
     }
 
     vec3 palettePlasma(float t, float seed, float cycle) {
-      float p = t * 2.0 + cycle * 2.0 + seed * 6.28318;
+      float p = t * 2.0 + cycle * 2.0;
       return vec3(
         0.5 + 0.5 * sin(p),
         0.5 + 0.5 * sin(p + 2.094),
@@ -146,13 +148,27 @@ function createFractalRenderer(glCtx) {
       return dot(color, vec3(0.2126, 0.7152, 0.0722));
     }
 
-    float paletteCycleRate(float mode, float seed) {
+    float paletteCycleRate(float mode, float seed, bool enhanced) {
       float drift = fract(seed * 7.13);
-      if (mode < 0.5) return 0.045 + drift * 0.085;
-      if (mode < 1.5) return 0.060 + drift * 0.110;
-      if (mode < 2.5) return 0.050 + drift * 0.080;
-      if (mode < 3.5) return 0.060 + drift * 0.105;
-      return 0.050 + drift * 0.090;
+      if (enhanced) {
+        if (mode < 0.5) return (0.100 + drift * 0.165) * 1.18;
+        if (mode < 1.5) return (0.115 + drift * 0.185) * 1.18;
+        if (mode < 2.5) return (0.095 + drift * 0.155) * 1.18;
+        if (mode < 3.5) return (0.110 + drift * 0.180) * 1.18;
+        return (0.100 + drift * 0.170) * 1.18;
+      }
+      if (mode < 0.5) return (0.045 + drift * 0.085) * 1.35;
+      if (mode < 1.5) return (0.060 + drift * 0.110) * 1.35;
+      if (mode < 2.5) return (0.050 + drift * 0.080) * 1.35;
+      if (mode < 3.5) return (0.060 + drift * 0.105) * 1.35;
+      return (0.050 + drift * 0.090) * 1.35;
+    }
+
+    float paletteCycleModeBoost(float mode) {
+      // Five-stop palettes need extra phase speed to avoid visually stagnant long blends.
+      if (mode < 1.5) return mode < 0.5 ? 1.0 : 1.65;
+      if (mode < 3.5) return mode < 2.5 ? 1.0 : 4.4;
+      return 1.0;
     }
 
     vec2 cMul(vec2 a, vec2 b) {
@@ -186,6 +202,7 @@ function createFractalRenderer(glCtx) {
       const float MODE_MANDELBROT = 5.0;
       const float TAU_POWER = 6.28318530718;
       const float NON_JULIA_VIEW_SCALE = 1.0; // >1 shrinks set, more outside color
+      const float NON_JULIA_DOMAIN_WARP = 0.0; // 0 = no edge-driven domain distortion
       const float NON_JULIA_OUTER_PAD = 1.1; // >1 thickens outside shell
       // Keep full procedural re-rendering while preventing spin-induced morphology drift.
       const float NON_JULIA_EDGE_SPIN_WOBBLE = 0.02; // 0 = rigid silhouette under spin
@@ -196,21 +213,31 @@ function createFractalRenderer(glCtx) {
       float r = length(v_local);
       bool isJulia = abs(mode - MODE_JULIA) < 0.5;
       bool isMagnet = abs(mode - MODE_MAGNET) < 0.5;
+      bool inDive = u_diveMode > 0.5;
+      bool enhanceColor = u_colorEnhance > 0.5;
+      bool liftMixOn = u_liftMixOn > 0.5;
+      float fractalZoomDepth = clamp(log2(1.0 / max(v_fractal.z, 1e-7)), 0.0, 16.0);
       float chromaTweak = clamp(u_chromaTweak, 0.0, 1.0);
       float neonTweak = clamp(u_neonTweak * (isJulia ? 1.5 : 1.0), 0.0, 1.0);
       float ang = atan(v_local.y, v_local.x);
       float edgePhase = v_palette * 6.28318 + dot(v_fractal.xy, vec2(23.17, 37.91));
-      float edgeNoise = 0.12 * sin(7.0 * ang + edgePhase + v_spin * NON_JULIA_EDGE_SPIN_WOBBLE)
-                      + 0.07 * sin(13.0 * ang + edgePhase * 1.37);
+      float edgeNoise = inDive
+        ? 0.0
+        : (0.12 * sin(7.0 * ang + edgePhase + v_spin * NON_JULIA_EDGE_SPIN_WOBBLE)
+          + 0.07 * sin(13.0 * ang + edgePhase * 1.37));
       float edge = 1.0 + edgeNoise;
       // Non-Julia classes keep the rock shell; Julia derives visible silhouette from iteration field.
-      float edgeClip = isJulia ? 1.22 : edge * NON_JULIA_OUTER_PAD;
+      float edgeClip = inDive ? 1.0 : (isJulia ? 1.22 : edge * NON_JULIA_OUTER_PAD);
       if (r > edgeClip) {
         discard;
       }
 
-      vec2 p = isJulia ? v_local : (v_local / edge);
-      if (!isJulia) p *= NON_JULIA_VIEW_SCALE;
+      vec2 p = v_local;
+      if (!isJulia && !inDive) {
+        vec2 warped = v_local / edge;
+        p = mix(v_local, warped, NON_JULIA_DOMAIN_WARP);
+        p *= NON_JULIA_VIEW_SCALE;
+      }
       float domainAngle = v_spin * DOMAIN_SPIN_FACTOR + u_time * DOMAIN_TIME_FACTOR;
       float c = cos(domainAngle);
       float s = sin(domainAngle);
@@ -233,16 +260,31 @@ function createFractalRenderer(glCtx) {
       vec2 z = vec2(0.0);
       if (isJulia) {
         z = samplePoint;
-        vec2 cDrift = vec2(
-          sin(u_time * 0.19 + v_palette * 8.3) * 0.0042,
-          cos(u_time * 0.17 + v_palette * 6.7) * 0.0042
-        );
+        vec2 cDrift = vec2(0.0);
+        if (!inDive) {
+          // Restore the late-wave Julia "frenzy" without adding early-game noise.
+          float sizeStress = smoothstep(0.42, 1.0, clamp(v_sizeNorm, 0.0, 1.0));
+          float zoomStress = smoothstep(1.6, 5.8, fractalZoomDepth);
+          float chaosStress = max(sizeStress, zoomStress * 0.92);
+          float driftAmp = (enhanceColor ? 0.0042 : 0.0038) * chaosStress;
+          cDrift = vec2(
+            sin(u_time * 0.19 + v_palette * 8.3) * driftAmp,
+            cos(u_time * 0.17 + v_palette * 6.7) * driftAmp
+          );
+        }
         cplx = v_juliaC + cDrift;
       }
 
       // Linear iteration ramp by growth size ratio:
       // v_sizeNorm = 0 at spawn size, 1 at ~3x spawn size.
       int maxIter = int(mix(50.0, 150.0, clamp(v_sizeNorm, 0.0, 1.0)) + 0.5);
+      if (inDive) {
+        maxIter = int(clamp(180.0 + fractalZoomDepth * 18.0, 180.0, 360.0));
+      } else if (enhanceColor) {
+        float zoomDepth = clamp(fractalZoomDepth, 0.0, 8.0);
+        maxIter += int(zoomDepth * 10.0 + 0.5);
+        maxIter = int(clamp(float(maxIter), 54.0, 220.0));
+      }
       int iBreak = maxIter;
       float smoothIter = float(maxIter);
       float smoothBase = 2.8;
@@ -252,7 +294,7 @@ function createFractalRenderer(glCtx) {
       } else if (abs(mode - MODE_MAGNET) < 0.5) {
         escapeRadius = 10.0;
       }
-      if (u_perimeterOn < 0.5) {
+      if (u_perimeterOn < 0.5 && enhanceColor) {
         // Mild bailout trim for outlineless mode; keep it conservative to avoid full blackout.
         if (abs(mode - MODE_MAGNET) < 0.5) {
           escapeRadius = min(escapeRadius, 7.5);
@@ -264,7 +306,7 @@ function createFractalRenderer(glCtx) {
       float orbitTrapCross = 1e9;
       float orbitTrapCircle = 1e9;
 
-      for (int i = 0; i < 180; i++) {
+      for (int i = 0; i < 360; i++) {
         if (i >= maxIter) break;
         if (abs(mode - MODE_TAU) < 0.5) {
           z = cPowReal(z, TAU_POWER) + cplx;
@@ -314,37 +356,53 @@ function createFractalRenderer(glCtx) {
       float bandPhase = warpEnergy * 0.022 + v_palette * 0.17;
       // Force visible variation on tiny fractaloids by quantizing coarse bands.
       float bandCoordWide = smoothIter * mix(0.052, 0.0096, v_sizeNorm);
-      float bandWideQuant = floor(bandCoordWide * 24.0) / 14.0;
-      float bandCoordDetail = smoothIter * mix(0.015, 0.044, v_sizeNorm);
+      float quantMix = (inDive || !enhanceColor) ? 0.0 : smoothstep(0.34, 0.0, v_sizeNorm);
+      float bandWideQuant = mix(bandCoordWide, floor(bandCoordWide * 24.0) / 14.0, quantMix);
+      float bandDetailFreq = enhanceColor
+        ? mix(0.015, 0.044, v_sizeNorm)
+        : mix(0.028, 0.082, v_sizeNorm);
+      float bandCoordDetail = smoothIter * bandDetailFreq;
       float tWide = fract(bandWideQuant + bandPhase);
       float tDetail = fract(bandCoordDetail + bandPhase * 0.52);
-      float t = mix(tWide, tDetail, 0.18);
-      float paletteCycle = u_time * paletteCycleRate(v_paletteMode, v_palette) + v_palette * 6.28318;
+      float t = inDive
+        ? fract(bandCoordDetail * 0.7 + bandPhase * 0.85)
+        : (enhanceColor
+          ? mix(tWide, tDetail, 0.34 + 0.28 * clamp(v_sizeNorm, 0.0, 1.0))
+          : tDetail);
+      float paletteCycle = u_time
+        * paletteCycleRate(v_paletteMode, v_palette, enhanceColor)
+        * paletteCycleModeBoost(v_paletteMode)
+        + v_palette * 6.28318;
       float insideMaskHard = step(float(maxIter), float(iBreak));
       float insideMask = insideMaskHard;
-      if (!isJulia) {
-        // Soften non-Julia interior fill to avoid a stamped dark silhouette.
-        insideMask = smoothstep(0.76, 0.8, iterRatio);
-      }
-      if (isMagnet) {
-        // Magnet benefits from an even softer interior gate so shape detail dominates.
-        insideMask = smoothstep(0.70, 0.994, iterRatio);
+      if (enhanceColor) {
+        if (!isJulia) {
+          // Enhanced look: soften non-Julia interior fill to avoid hard silhouette.
+          insideMask = smoothstep(0.76, 0.8, iterRatio);
+        }
+        if (isMagnet) {
+          // Enhanced look: magnet benefits from an even softer interior gate.
+          insideMask = smoothstep(0.70, 0.994, iterRatio);
+        }
       }
       float trapCrossTone = exp(-orbitTrapCross * 0.50);
       float trapCircleTone = exp(-orbitTrapCircle * 9.0);
       float trapTone = clamp(trapCrossTone * 0.65 + trapCircleTone * 0.35, 0.0, 1.0);
-      vec3 insideBase = isMagnet ? vec3(0.015, 0.02, 0.03) : vec3(0.09, 0.11, 0.15);
+      vec3 insideBase = enhanceColor
+        ? (isMagnet ? vec3(0.015, 0.02, 0.03) : vec3(0.09, 0.11, 0.15))
+        : vec3(0.0, 0.0, 0.0);
       vec3 insideAccent = paletteByMode(
         fract(t * 0.42 + trapTone * 0.85 + v_palette * 0.19),
         fract(v_palette + 0.13),
         paletteCycle * 0.5 + 0.7,
         mod(v_paletteMode + 0.5, 5.0)
       );
-      float insideAccentMix = (0.15 + trapTone * 0.15) * neonTweak;
+      float insideAccentMix = enhanceColor ? ((0.15 + trapTone * 0.15) * neonTweak) : 0.0;
       vec3 inside = mix(insideBase, insideAccent, insideAccentMix);
-      vec3 outside = paletteByMode(pow(t, 0.9), v_palette, paletteCycle, v_paletteMode);
+      float paletteT = enhanceColor ? pow(t, 0.9) : t;
+      vec3 outside = paletteByMode(paletteT, v_palette, paletteCycle, v_paletteMode);
       float outsideLuma = lumaOf(outside);
-      if (outsideLuma < 0.08 && chromaTweak > 0.0001) {
+      if (enhanceColor && liftMixOn && outsideLuma < 0.08 && chromaTweak > 0.0001) {
         vec3 lift = palettePlasma(fract(t * 0.55 + 0.19), fract(v_palette + 0.21), paletteCycle + 0.7);
         float liftMix = smoothstep(0.08, 0.0, outsideLuma) * 0.42 * chromaTweak;
         outside = mix(outside, lift, liftMix);
@@ -354,13 +412,15 @@ function createFractalRenderer(glCtx) {
       float edgeForEffects = isJulia ? mix(0.84, 1.03, iterRatio) : edge;
       float glow = smoothstep(edgeForEffects + 0.16, 0.0, r);
       float rim = smoothstep(edgeForEffects - 0.12, edgeForEffects, r);
-      float lightGain = mix(1.0, 0.96 + glow * 0.46, neonTweak);
+      float lightGain = enhanceColor ? mix(1.0, 0.96 + glow * 0.46, neonTweak) : 1.0;
       color *= lightGain;
-      color += rim * vec3(0.46, 0.28, 0.10) * neonTweak;
-      color += vec3(0.04, 0.02, 0.07) * min(1.0, warpEnergy * 0.55) * neonTweak;
-      color += vec3(0.03, 0.03, 0.04) * neonTweak;
+      if (enhanceColor) {
+        color += rim * vec3(0.46, 0.28, 0.10) * neonTweak;
+        color += vec3(0.04, 0.02, 0.07) * min(1.0, warpEnergy * 0.55) * neonTweak;
+        color += vec3(0.03, 0.03, 0.04) * neonTweak;
+      }
       float colorChroma = chromaOf(color);
-      if (colorChroma < 0.012 && chromaTweak > 0.0001) {
+      if (enhanceColor && colorChroma < 0.012 && chromaTweak > 0.0001) {
         float accentMode = mod(v_paletteMode + 1.0, 5.0);
         vec3 accent = paletteByMode(fract(v_palette * 1.73 + iterRatio * 0.33), fract(v_palette + 0.37), paletteCycle + 0.83, accentMode);
         float fixAmount = smoothstep(0.12, 0.0, colorChroma);
@@ -384,7 +444,7 @@ function createFractalRenderer(glCtx) {
         color += vec3(0.06, 0.05, 0.08) * boundaryBand * neonTweak;
       }
 
-      if (u_perimeterOn < 0.5) {
+      if (u_perimeterOn < 0.5 && !inDive && enhanceColor) {
         // Outlineless mode: darken toward black, but fail-open so fractaloids never vanish.
         float outsideNearBoundary = (1.0 - insideMask) * smoothstep(0.46, 0.997, iterRatio);
         float bandEdge = abs(fract(bandCoordWide * 1.35 + bandPhase * 0.31) - 0.5);
@@ -491,6 +551,9 @@ function createFractalRenderer(glCtx) {
   const uPerimeterOn = glCtx.getUniformLocation(program, 'u_perimeterOn');
   const uChromaTweak = glCtx.getUniformLocation(program, 'u_chromaTweak');
   const uNeonTweak = glCtx.getUniformLocation(program, 'u_neonTweak');
+  const uDiveMode = glCtx.getUniformLocation(program, 'u_diveMode');
+  const uColorEnhance = glCtx.getUniformLocation(program, 'u_colorEnhance');
+  const uLiftMixOn = glCtx.getUniformLocation(program, 'u_liftMixOn');
 
   const data = new Float32Array(maxInstances * floatsPerInstance);
   const warpData = new Float32Array(maxWarpBullets * 3);
@@ -555,9 +618,15 @@ function createFractalRenderer(glCtx) {
     const perimeterOn = options && options.perimeterOn ? 1.0 : 0.0;
     const chromaTweak = options && typeof options.chromaTweak === 'number' ? options.chromaTweak : 1.0;
     const neonTweak = options && typeof options.neonTweak === 'number' ? options.neonTweak : 1.0;
+    const diveMode = options && options.diveMode ? 1.0 : 0.0;
+    const colorEnhance = options && options.colorEnhance ? 1.0 : 0.0;
+    const liftMixOn = options && options.liftMixOn === false ? 0.0 : 1.0;
     glCtx.uniform1f(uPerimeterOn, perimeterOn);
     glCtx.uniform1f(uChromaTweak, chromaTweak);
     glCtx.uniform1f(uNeonTweak, neonTweak);
+    glCtx.uniform1f(uDiveMode, diveMode);
+    glCtx.uniform1f(uColorEnhance, colorEnhance);
+    glCtx.uniform1f(uLiftMixOn, liftMixOn);
     glCtx.bindVertexArray(vao);
     glCtx.bindBuffer(glCtx.ARRAY_BUFFER, instances);
     glCtx.bufferSubData(glCtx.ARRAY_BUFFER, 0, data.subarray(0, count * floatsPerInstance));

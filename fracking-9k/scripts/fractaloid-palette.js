@@ -47,7 +47,7 @@
       const mix = (a, b, m) => a + (b - a) * m;
 
       if (paletteMode === P.ember) {
-        const q = fract(p + cycle * 0.05 + seed * 0.37);
+        const q = fract(p + cycle * 0.05);
         const c0 = [0.010, 0.000, 0.000];
         const c1 = [0.180, 0.000, 0.000];
         const c2 = [0.600, 0.080, 0.000];
@@ -73,18 +73,18 @@
       }
 
       if (paletteMode === P.firefly) {
-        const p2 = (p + seed * 0.11) * tau + cycle * 1.1;
+        const p2 = p * tau + cycle * 1.1;
         const g = Math.pow(0.5 + 0.5 * Math.sin(p2 + 0.7), 2.5);
         return [
           clamp(0.02 + 0.18 * g, 0, 1),
           clamp(0.08 + 0.55 * g, 0, 1),
-          clamp(0.01 + 0.10 * Math.sin(p2 * 0.6 + 2.0 + seed * 4.0), 0, 1)
+          clamp(0.01 + 0.10 * Math.sin(p2 * 0.6 + 2.0), 0, 1)
         ];
       }
 
       if (paletteMode === P.gold) {
-        const sn = Math.max(p + seed * 0.06, 0.000001);
-        const q = fract(Math.pow(sn, 0.35) * 0.15 + cycle * 0.02 + seed * 0.28);
+        const sn = Math.max(p, 0.000001);
+        const q = fract(Math.pow(sn, 0.35) * 0.15 + cycle * 0.02);
         const c0 = [0.000, 0.027, 0.392];
         const c1 = [0.125, 0.420, 0.796];
         const c2 = [0.929, 1.000, 1.000];
@@ -114,7 +114,7 @@
       }
 
       if (paletteMode === P.plasma) {
-        const p2 = p * 2.0 + cycle * 2.0 + seed * tau;
+        const p2 = p * 2.0 + cycle * 2.0;
         return [
           0.5 + 0.5 * Math.sin(p2),
           0.5 + 0.5 * Math.sin(p2 + 2.094),
@@ -123,9 +123,9 @@
       }
 
       return [
-        0.5 + 0.5 * Math.cos(3.0 + p + cycle * 0.5 + cycle * 0.31),
-        0.5 + 0.5 * Math.cos(3.0 + p * 0.7 + cycle * 0.3 + cycle * 0.19),
-        0.5 + 0.5 * Math.cos(3.0 + p * 0.5 + cycle * 0.2 + cycle * 0.11)
+        0.5 + 0.5 * Math.cos(3.0 + p + cycle * 0.5),
+        0.5 + 0.5 * Math.cos(3.0 + p * 0.7 + cycle * 0.3),
+        0.5 + 0.5 * Math.cos(3.0 + p * 0.5 + cycle * 0.2)
       ];
     }
 

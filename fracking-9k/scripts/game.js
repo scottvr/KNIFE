@@ -31,6 +31,18 @@
   if (!(window.FrackingFractaloidClasses && typeof window.FrackingFractaloidClasses.create === 'function')) {
     noteBootCritical('Fractaloid classes module missing; class catalog unavailable.');
   }
+  if (!(window.FrackingFractaloidViewfit && typeof window.FrackingFractaloidViewfit.create === 'function')) {
+    noteBootCritical('Fractaloid view-fit module missing; fractal tuning unavailable.');
+  }
+  if (!(window.FrackingFractaloidRuntime && typeof window.FrackingFractaloidRuntime.create === 'function')) {
+    noteBootCritical('Fractaloid runtime module missing; fractaloid orchestration unavailable.');
+  }
+  if (!(window.FrackingFractaloidCombat && typeof window.FrackingFractaloidCombat.create === 'function')) {
+    noteBootWarning('Fractaloid combat module missing; using inline combat fallback.');
+  }
+  if (!(window.FrackingGameplaySystems && typeof window.FrackingGameplaySystems.create === 'function')) {
+    noteBootCritical('Gameplay systems module missing; saucer/particles/collision orchestration unavailable.');
+  }
   if (!(window.FrackingInputFeel && typeof window.FrackingInputFeel.create === 'function')) {
     noteBootWarning('Input-feel module missing; using direct input without tap grace/buffer.');
   }
@@ -186,7 +198,7 @@
     ? window.FrackingInputFeel.create({
         keys,
         consumeHyperPressed: () => inputSystem.consumeHyperPressed(),
-        fireGraceSec: 0.09,
+        fireGraceSec: 0.06,
         thrustGraceSec: 0.08,
         hyperBufferSec: 0.22
       })
@@ -203,27 +215,13 @@
           reset: () => { hyperBuffered = false; }
         };
       })();
+  let fractaloidRuntimeSystem = null;
+  let fractaloidCombatSystem = null;
+  let gameplaySystems = null;
 
   function nudgeFractalDive(code, shiftKey = false) {
-    if (state !== 'fractaldive' || !fractalDive) return false;
-    const d = fractalDive;
-    const panStep = Math.max(d.zoom * (shiftKey ? 0.38 : 0.16), 1e-7);
-    if (code === 'ArrowLeft' || code === 'KeyA') d.panX -= panStep;
-    else if (code === 'ArrowRight' || code === 'KeyD') d.panX += panStep;
-    else if (code === 'ArrowUp' || code === 'KeyW') d.panY -= panStep;
-    else if (code === 'ArrowDown' || code === 'KeyS') d.panY += panStep;
-    else if (code === 'KeyQ' || code === 'Minus' || code === 'NumpadSubtract') d.zoom = clampDiveZoom(d.zoom * FRACTAL_DIVE_ZOOM_STEP_OUT);
-    else if (code === 'KeyE' || code === 'Equal' || code === 'NumpadAdd') d.zoom = clampDiveZoom(d.zoom * FRACTAL_DIVE_ZOOM_STEP_IN);
-    else if (code === 'KeyR') {
-      d.panX = 0;
-      d.panY = 0;
-      d.zoom = clampDiveZoom(d.zoom);
-    } else if (code === 'Escape') {
-      exitFractalDive();
-    } else {
-      return false;
-    }
-    return true;
+    if (state !== 'fractaldive' || !fractaloidRuntimeSystem) return false;
+    return fractaloidRuntimeSystem.nudgeDive(code, shiftKey, () => exitFractalDive());
   }
 
   window.addEventListener('keydown', (e) => {
@@ -232,8 +230,8 @@
   });
 
   window.addEventListener('wheel', (e) => {
-    if (state !== 'fractaldive' || !fractalDive) return;
-    fractalDive.zoom = clampDiveZoom(fractalDive.zoom * (e.deltaY > 0 ? FRACTAL_DIVE_ZOOM_STEP_OUT : FRACTAL_DIVE_ZOOM_STEP_IN));
+    if (state !== 'fractaldive' || !fractaloidRuntimeSystem || !fractaloidRuntimeSystem.hasDive()) return;
+    fractaloidRuntimeSystem.wheelDive(e.deltaY);
     e.preventDefault();
   }, { passive: false });
 
@@ -258,7 +256,6 @@
   let saucerTimer = 0;
   let waveProfile = null;
   let activeFractaloidClass = 'mandelbrot';
-  let fractalDive = null;
   let deathLifeSpent = false;
   const funPack = (window.FrackingFunPack && typeof window.FrackingFunPack.create === 'function')
     ? window.FrackingFunPack.create()
@@ -286,16 +283,16 @@
   let wavePace = { spawnMul: 1, speedMul: 1, saucerCadenceMul: 1 };
 
   // Tunable constants (classic-ish)
-  const SHIP_SIZE = 22;
-  const SHIP_TURN = 4.5; // rad/s
+  const SHIP_SIZE = 20;
+  const SHIP_TURN = 4.0 // rad/s
   const SHIP_THRUST = 220; // px/s^2
   const SHIP_FRICTION = 0.4; // per second
-  const SHIP_MAX_SPEED = 420;
-  const BULLET_SPEED = 540;
+  const SHIP_MAX_SPEED = 666;
+  const BULLET_SPEED = 666;
   const BULLET_LIFE = 0.85;
-  const MAX_BULLETS = 8; // power-of-two ammo ceiling
-  const FIRE_COOLDOWN_BASE = 0.04;
-  const FIRE_PATTERN = [2, 2,  4, 2, 2, 4, 8, 4, 2];
+  const MAX_BULLETS = 16; // power-of-two ammo ceiling
+  const FIRE_COOLDOWN_BASE = 0.02;
+  const FIRE_PATTERN = [ 4, 4, 2, 2, 8, 8 ];
   const SHIP_FRACTAL_CLASS = 'mandelbrot_outline'; // 'sierpinski' | 'mandelbrot_outline'
   const SHIP_FRACTAL_CLASSES = ['sierpinski', 'mandelbrot_outline'];
   const FRACTALOID_CLASS = 'cycle'; // 'cycle' | 'tau' | 'magnet' | 'buffalo' | 'tricorn' | 'julia' | 'mandelbrot'
@@ -324,10 +321,26 @@
   const FRACTALOID_CLASS_SEQUENCE = fractaloidClassSystem.classSequence;
   const FRACTALOID_CLASS_MODES = fractaloidClassSystem.classModes;
   const FRACTAL_DIVE_AUTO_WAVE_INTERVAL = fractaloidClassSystem.autoDiveWaveInterval;
+  const fractaloidViewfitSystem = (window.FrackingFractaloidViewfit && typeof window.FrackingFractaloidViewfit.create === 'function')
+    ? window.FrackingFractaloidViewfit.create({
+        classModes: FRACTALOID_CLASS_MODES
+      })
+    : {
+        juliaViewAttempts: 14,
+        mandelViewAttempts: 10,
+        tuneJuliaView: (jx, jy, fx, fy, fzoom) => ({ fx, fy, fzoom, fill: 0.5 }),
+        tuneMandelbrotView: (mode, fx, fy, fzoom) => ({ fx, fy, fzoom, escape: 0.5 }),
+        deriveMandelZoomFloorRatio: () => 0.9,
+        centerFractaloidView: (mode, jx, jy, fx, fy) => ({ fx, fy }),
+        getJuliaAreaScale: () => 1.0
+      };
   const FRACTALOID_PALETTE_MODES = { cosmic: 0, ember: 1, firefly: 2, gold: 3, plasma: 4 };
   const FRACTALOID_PERIMETER_MODE = 'none'; // 'none' | 'polygon'
-  const FRACTALOID_CHROMA_TWEAK = 0.5; // 0..1, set to 0 to disable chroma/luma rescue boosts
-  const FRACTALOID_NEON_TWEAK = 0.01; // 0..1, set to 0 for flatter/older look
+  const FRACTALOID_COLORIZER_MODE = 'classic'; // 'classic' | 'enhanced'
+  const FRACTALOID_COLORIZER_ENHANCED = FRACTALOID_COLORIZER_MODE === 'enhanced';
+  const FRACTALOID_ENHANCED_LIFTMIX = false; // set true to re-enable luma-lift rescue in enhanced mode
+  const FRACTALOID_CHROMA_TWEAK = FRACTALOID_COLORIZER_MODE === 'enhanced' ? 1.0 : 0.0; // rescue boosts are enhanced-only
+  const FRACTALOID_NEON_TWEAK = FRACTALOID_COLORIZER_MODE === 'enhanced' ? 0.1 : 0.0; // boosted glow path is enhanced-only
   const SAUCER_FRACTAL_CLASS = 'cycle'; // 'cycle' | 'classic' | 'sierpinski' | 'koch'
   const SAUCER_FRACTAL_CLASSES = ['classic', 'sierpinski', 'koch'];
   const shipIconAsset = window.FrackingShipIcon || null;
@@ -352,29 +365,6 @@
     { x: -0.7269, y: 0.1889 },
     { x: -0.74543, y: 0.11301 }
   ];
-  const JULIA_AREA_TARGET_FILL = 0.49;
-  const JULIA_AREA_MIN_SCALE = 3.66;
-  const JULIA_AREA_MAX_SCALE = 4.0;
-  const JULIA_AREA_SCALE_BLEND = 0.58;
-  const JULIA_AREA_SAMPLE_GRID = 17;
-  const JULIA_AREA_MAX_ITER = 76;
-  const JULIA_VISIBLE_FILL_MIN = .055;
-  const JULIA_VIEW_ATTEMPTS = 14;
-  const JULIA_SHAPE_SCALE_FAILSAFE = 1.16;
-  const JULIA_ZOOM_MIN = 0.54;
-  const JULIA_ZOOM_MAX = 2.8;
-  const juliaAreaScaleCache = new Map();
-  const MANDEL_VIEW_ATTEMPTS = 10;
-  const MANDEL_SAMPLE_GRID = 13;
-  const MANDEL_MAX_ITER = 72;
-  const MANDEL_ESCAPE_TARGET = 0.42;
-  const MANDEL_ESCAPE_MIN = 0.16;
-  const MANDEL_ZOOM_MIN = 0.56;
-  const MANDEL_ZOOM_MAX = 2.9;
-  const MANDEL_ZOOM_FLOOR_STEPS = [0.9, 0.82, 0.74, 0.66, 0.58, 0.52, 0.46, 0.4];
-  const FRACTALOID_CENTERING_GRID = 15;
-  const FRACTALOID_CENTERING_MAX_ITER = 84;
-  const FRACTALOID_CENTERING_PASSES = 2;
 
   const FRACTALOID_SIZES = { 4: 74, 3: 44, 2: 26, 1: 14 }; // size key -> radius
   const FRACTALOID_SCORE = { 4: 10, 3: 20, 2: 50, 1: 100 };
@@ -391,15 +381,143 @@
   const FRACTAL_DIVE_ZOOM_STEP_OUT = 1.14;
   const FRACTAL_DIVE_MIN_ZOOM = 1e-9;
   const FRACTAL_DIVE_MAX_ZOOM = 12.0;
+  fractaloidRuntimeSystem = (window.FrackingFractaloidRuntime && typeof window.FrackingFractaloidRuntime.create === 'function')
+    ? window.FrackingFractaloidRuntime.create({
+        diveZoomStepIn: FRACTAL_DIVE_ZOOM_STEP_IN,
+        diveZoomStepOut: FRACTAL_DIVE_ZOOM_STEP_OUT,
+        diveMinZoom: FRACTAL_DIVE_MIN_ZOOM,
+        diveMaxZoom: FRACTAL_DIVE_MAX_ZOOM
+      })
+    : {
+        hasDive: () => false,
+        clearDive: () => {},
+        clampDiveZoom: (v) => v,
+        updateFractaloid: () => {},
+        drawFractaloidPerimeter: () => {},
+        drawFractaloids: () => {},
+        enterDive: () => false,
+        maybeEnterDive: () => false,
+        nudgeDive: () => false,
+        wheelDive: () => false,
+        updateDive: () => {},
+        drawDiveOverlay: () => {},
+        consumeDiveTarget: () => null
+      };
+  fractaloidCombatSystem = (window.FrackingFractaloidCombat && typeof window.FrackingFractaloidCombat.create === 'function')
+    ? window.FrackingFractaloidCombat.create({
+        scoreBySize: FRACTALOID_SCORE
+      })
+    : {
+        splitFractaloid: (a, hitPoint = null, grantScore = true, ctx = {}) => {
+          const spawnShockwave = typeof ctx.spawnShockwave === 'function' ? ctx.spawnShockwave : () => {};
+          const explode = typeof ctx.explode === 'function' ? ctx.explode : () => {};
+          const makeFractaloid = typeof ctx.makeFractaloid === 'function' ? ctx.makeFractaloid : () => null;
+          const awardFractaloidScore = typeof ctx.awardFractaloidScore === 'function' ? ctx.awardFractaloidScore : () => 0;
+          const fractaloids = Array.isArray(ctx.fractaloids) ? ctx.fractaloids : [];
+          const wave = ctx.wave || 1;
+          const sfxSystem = ctx.sfx || { bangLarge: () => {}, bangMedium: () => {}, bangSmall: () => {} };
+          spawnShockwave(a.x, a.y, a.r, a.fseed || 0);
+          if (grantScore) awardFractaloidScore(FRACTALOID_SCORE[a.sizeKey]);
+          if (a.sizeKey === 4) {
+            sfxSystem.bangLarge();
+            explode(a.x, a.y, 30, 1.9);
+            spawnShockwave(a.x, a.y, a.r * 1.2, a.fseed || 0);
+            for (let i = 0; i < 3; i++) fractaloids.push(makeFractaloid(a.x, a.y, 3, wave * 6.2, a, hitPoint));
+            for (let i = 0; i < 2; i++) fractaloids.push(makeFractaloid(a.x, a.y, 2, wave * 6.8, a, hitPoint));
+          } else if (a.sizeKey === 3) {
+            sfxSystem.bangLarge();
+            explode(a.x, a.y, 14, 1.0);
+            fractaloids.push(makeFractaloid(a.x, a.y, 2, wave * 4, a, hitPoint));
+            fractaloids.push(makeFractaloid(a.x, a.y, 2, wave * 4, a, hitPoint));
+          } else if (a.sizeKey === 2) {
+            sfxSystem.bangMedium();
+            explode(a.x, a.y, 10, 0.8);
+            fractaloids.push(makeFractaloid(a.x, a.y, 1, wave * 4, a, hitPoint));
+            fractaloids.push(makeFractaloid(a.x, a.y, 1, wave * 4, a, hitPoint));
+          } else {
+            sfxSystem.bangSmall();
+            explode(a.x, a.y, 8, 0.6);
+          }
+        },
+        damageFractaloid: (a, hitPoint, grantScore, ctx = {}) => {
+          const spawnShockwave = typeof ctx.spawnShockwave === 'function' ? ctx.spawnShockwave : () => {};
+          const explode = typeof ctx.explode === 'function' ? ctx.explode : () => {};
+          const addRawScore = typeof ctx.addRawScore === 'function' ? ctx.addRawScore : () => {};
+          const fractFn = typeof ctx.fract === 'function' ? ctx.fract : (v) => v - Math.floor(v);
+          if (a.hp > 1) {
+            a.hp -= 1;
+            a.fseed = fractFn(a.fseed + 0.14 + Math.random() * 0.2);
+            a.age = Math.min(a.lifeSpan, a.age + a.lifeSpan * 0.08);
+            spawnShockwave(a.x, a.y, a.r * 0.66, a.fseed || 0);
+            explode(a.x, a.y, 8, 0.45);
+            if (grantScore) addRawScore(Math.max(8, Math.floor((FRACTALOID_SCORE[a.sizeKey] || 40) * 0.12)));
+            return false;
+          }
+          fractaloidCombatSystem.splitFractaloid(a, hitPoint, grantScore, ctx);
+          return true;
+        }
+      };
   const WAVE_GENOMES = [
     { name: 'Filament', focusX: -0.7445, focusY: 0.1318, seedBias: 0.06, spread: 1.0, zoomBase: 1.62 },
     { name: 'Seahorse', focusX: -0.748, focusY: 0.104, seedBias: 0.24, spread: 0.9, zoomBase: 1.72 },
     { name: 'Needle', focusX: -1.25066, focusY: 0.02012, seedBias: 0.56, spread: 0.62, zoomBase: 1.86 },
     { name: 'Elephant', focusX: 0.285, focusY: 0.012, seedBias: 0.78, spread: 0.72, zoomBase: 1.78 }
   ];
-
   const SAUCER_LARGE = { r: 18, score: 200, speed: 90, fireRate: 1.6, accuracy: 0.0 };
   const SAUCER_SMALL = { r: 15, score: 1000, speed: 130, fireRate: 1.0, accuracy: 0.75 };
+  gameplaySystems = (window.FrackingGameplaySystems && typeof window.FrackingGameplaySystems.create === 'function')
+    ? window.FrackingGameplaySystems.create({
+        ctx,
+        rand,
+        randSign,
+        dist2,
+        maybeEnterFractalDive,
+        damageFractaloid,
+        killShip,
+        resolveSaucerFractalClass,
+        drawSierpinski,
+        sfx,
+        SAUCER_LARGE,
+        SAUCER_SMALL,
+        BULLET_SPEED,
+        SHOCKWAVE_LIFE,
+        SHOCKWAVE_RADIUS_GAIN,
+        SHOCKWAVE_WIDTH,
+        state: {
+          getWidth: () => W,
+          getHeight: () => H,
+          getScore: () => score,
+          setScore: (v) => { score = v; },
+          getLives: () => lives,
+          setLives: (v) => { lives = v; },
+          getNextExtraLife: () => nextExtraLife,
+          setNextExtraLife: (v) => { nextExtraLife = v; },
+          getWave: () => wave,
+          getShip: () => ship,
+          getBullets: () => bullets,
+          getSaucerBullets: () => saucerBullets,
+          getFractaloids: () => fractaloids,
+          getParticles: () => particles,
+          getShockwaves: () => shockwaves,
+          getSaucer: () => saucer,
+          setSaucer: (v) => { saucer = v; }
+        }
+      })
+    : {
+        spawnSaucer: () => {},
+        updateSaucer: () => {},
+        drawSaucer: () => {},
+        explode: () => {},
+        spawnShockwave: () => {},
+        updateParticles: () => {},
+        updateShockwaves: () => {},
+        drawParticles: () => {},
+        drawShockwaves: () => {},
+        updateBullets: () => {},
+        drawBullets: () => {},
+        checkCollisions: () => {},
+        checkExtraLife: () => {}
+      };
   const paletteSystem = (window.FrackingFractaloidPalette && typeof window.FrackingFractaloidPalette.create === 'function')
     ? window.FrackingFractaloidPalette.create({
         paletteModes: FRACTALOID_PALETTE_MODES,
@@ -431,333 +549,24 @@
   function waveNoise(w, salt) { return fract(Math.sin(w * 127.1 + salt * 311.7) * 43758.5453123); }
   function waveRange(w, salt, min, max) { return min + (max - min) * waveNoise(w, salt); }
 
-  function cPowReal(re, im, power) {
-    const r = Math.hypot(re, im);
-    if (r < 1e-9) return { re: 0, im: 0 };
-    const theta = Math.atan2(im, re);
-    const rp = Math.pow(r, power);
-    const pt = theta * power;
-    return { re: rp * Math.cos(pt), im: rp * Math.sin(pt) };
-  }
-
-  function cDiv(aRe, aIm, bRe, bIm) {
-    const denom = bRe * bRe + bIm * bIm;
-    if (denom < 1e-9) return { re: 1e6, im: 1e6 };
-    return {
-      re: (aRe * bRe + aIm * bIm) / denom,
-      im: (aIm * bRe - aRe * bIm) / denom
-    };
-  }
-
-  function iterateFractaloidOrbit(mode, cx, cy, jx, jy, maxIter = FRACTALOID_CENTERING_MAX_ITER) {
-    const tauPower = Math.PI * 2;
-    const isJulia = isJuliaMode(mode);
-    const bailout = mode === FRACTALOID_CLASS_MODES.magnet ? 10 : 4;
-    const bailout2 = bailout * bailout;
-    const cRe = isJulia ? jx : cx;
-    const cIm = isJulia ? jy : cy;
-    let zRe = isJulia ? cx : 0;
-    let zIm = isJulia ? cy : 0;
-
-    for (let i = 0; i < maxIter; i++) {
-      let nx;
-      let ny;
-      if (mode === FRACTALOID_CLASS_MODES.tau) {
-        const zp = cPowReal(zRe, zIm, tauPower);
-        nx = zp.re + cRe;
-        ny = zp.im + cIm;
-      } else if (mode === FRACTALOID_CLASS_MODES.magnet) {
-        const z2x = zRe * zRe - zIm * zIm;
-        const z2y = 2 * zRe * zIm;
-        const numRe = z2x + cRe - 1;
-        const numIm = z2y + cIm;
-        const denRe = 2 * zRe + cRe - 2;
-        const denIm = 2 * zIm + cIm;
-        const q = cDiv(numRe, numIm, denRe, denIm);
-        nx = q.re * q.re - q.im * q.im;
-        ny = 2 * q.re * q.im;
-      } else if (mode === FRACTALOID_CLASS_MODES.buffalo) {
-        nx = Math.abs(zRe * zRe - zIm * zIm) + cRe;
-        ny = Math.abs(2 * zRe * zIm) + cIm;
-      } else if (mode === FRACTALOID_CLASS_MODES.tricorn) {
-        nx = zRe * zRe - zIm * zIm + cRe;
-        ny = -2 * zRe * zIm + cIm;
-      } else {
-        nx = zRe * zRe - zIm * zIm + cRe;
-        ny = 2 * zRe * zIm + cIm;
-      }
-      zRe = nx;
-      zIm = ny;
-      if (zRe * zRe + zIm * zIm > bailout2) return i;
-    }
-
-    return maxIter;
-  }
-
-  function estimateFractaloidCentroid(mode, jx, jy, fx, fy, fzoom, sampleGrid = FRACTALOID_CENTERING_GRID, maxIter = FRACTALOID_CENTERING_MAX_ITER) {
-    let sumX = 0;
-    let sumY = 0;
-    let sumW = 0;
-    let samples = 0;
-    const juliaMode = isJuliaMode(mode);
-
-    for (let gy = 0; gy < sampleGrid; gy++) {
-      const y = ((gy + 0.5) / sampleGrid) * 2 - 1;
-      for (let gx = 0; gx < sampleGrid; gx++) {
-        const x = ((gx + 0.5) / sampleGrid) * 2 - 1;
-        if (Math.hypot(x, y) > 1.12) continue;
-
-        const cx = fx + x * fzoom;
-        const cy = fy + y * fzoom;
-        const iBreak = iterateFractaloidOrbit(mode, cx, cy, jx, jy, maxIter);
-        const iterRatio = iBreak / maxIter;
-        const interior = iBreak >= maxIter - 1 ? 1 : 0;
-
-        let weight;
-        if (juliaMode) {
-          const band = smoothstep(0.30, 0.86, iterRatio) * (1 - smoothstep(0.93, 0.999, iterRatio));
-          weight = band + interior * 0.22;
-        } else {
-          const boundary = smoothstep(0.56, 0.95, iterRatio);
-          weight = interior * 0.95 + boundary * 0.85;
-        }
-
-        if (weight > 0.0001) {
-          sumX += x * weight;
-          sumY += y * weight;
-          sumW += weight;
-        }
-        samples++;
-      }
-    }
-
-    if (sumW <= 1e-6 || samples <= 0) {
-      return { cx: 0, cy: 0, confidence: 0 };
-    }
-
-    return {
-      cx: sumX / sumW,
-      cy: sumY / sumW,
-      confidence: clamp(sumW / samples, 0, 1)
-    };
-  }
-
-  function centerFractaloidView(mode, jx, jy, fx, fy, fzoom, passes = FRACTALOID_CENTERING_PASSES) {
-    let tx = fx;
-    let ty = fy;
-    const magnetMode = mode === FRACTALOID_CLASS_MODES.magnet;
-    const passCount = magnetMode ? Math.max(passes + 2, 4) : passes;
-    const driftThreshold = magnetMode ? 0.0035 : 0.01;
-
-    for (let i = 0; i < passCount; i++) {
-      const centroid = estimateFractaloidCentroid(mode, jx, jy, tx, ty, fzoom);
-      const drift = Math.hypot(centroid.cx, centroid.cy);
-      if (drift < driftThreshold) break;
-      const baseStrength = magnetMode ? 0.92 : 0.72;
-      const falloff = magnetMode ? 0.14 : 0.2;
-      const passStrength = Math.max(0.22, baseStrength - i * falloff);
-      tx += centroid.cx * fzoom * passStrength;
-      ty += centroid.cy * fzoom * passStrength;
-    }
-    return { fx: tx, fy: ty };
-  }
-
-  function estimateMandelbrotEscapeFill(mode, fx, fy, fzoom) {
-    let escapeCount = 0;
-    let sampleCount = 0;
-    const grid = MANDEL_SAMPLE_GRID;
-    const maxIter = MANDEL_MAX_ITER;
-    const tauPower = Math.PI * 2;
-
-    for (let gy = 0; gy < grid; gy++) {
-      const y = ((gy + 0.5) / grid) * 2 - 1;
-      for (let gx = 0; gx < grid; gx++) {
-        const x = ((gx + 0.5) / grid) * 2 - 1;
-        const r = Math.hypot(x, y);
-        if (r > 1.15) continue;
-
-        const cx = fx + x * fzoom;
-        const cy = fy + y * fzoom;
-        let zx = 0;
-        let zy = 0;
-        let escaped = 0;
-        for (let i = 0; i < maxIter; i++) {
-          let nx;
-          let ny;
-          if (mode === FRACTALOID_CLASS_MODES.tau) {
-            const zp = cPowReal(zx, zy, tauPower);
-            nx = zp.re + cx;
-            ny = zp.im + cy;
-          } else if (mode === FRACTALOID_CLASS_MODES.magnet) {
-            const z2x = zx * zx - zy * zy;
-            const z2y = 2 * zx * zy;
-            const numRe = z2x + cx - 1;
-            const numIm = z2y + cy;
-            const denRe = 2 * zx + cx - 2;
-            const denIm = 2 * zy + cy;
-            const q = cDiv(numRe, numIm, denRe, denIm);
-            nx = q.re * q.re - q.im * q.im;
-            ny = 2 * q.re * q.im;
-          } else if (mode === FRACTALOID_CLASS_MODES.buffalo) {
-            nx = Math.abs(zx * zx - zy * zy) + cx;
-            ny = Math.abs(2 * zx * zy) + cy;
-          } else if (mode === FRACTALOID_CLASS_MODES.tricorn) {
-            nx = zx * zx - zy * zy + cx;
-            ny = -2 * zx * zy + cy;
-          } else {
-            nx = zx * zx - zy * zy + cx;
-            ny = 2 * zx * zy + cy;
-          }
-          zx = nx;
-          zy = ny;
-          const bailout = mode === FRACTALOID_CLASS_MODES.magnet ? 10 : 4;
-          if (zx * zx + zy * zy > bailout * bailout) {
-            escaped = 1;
-            break;
-          }
-        }
-
-        escapeCount += escaped;
-        sampleCount++;
-      }
-    }
-
-    if (sampleCount === 0) return 0.5;
-    return escapeCount / sampleCount;
-  }
-
-  function tuneMandelbrotView(mode, fx, fy, fzoom, spread, attempts = MANDEL_VIEW_ATTEMPTS, zoomMin = MANDEL_ZOOM_MIN, zoomMax = MANDEL_ZOOM_MAX) {
-    let bestFx = fx;
-    let bestFy = fy;
-    let bestZoom = fzoom;
-    let bestEscape = estimateMandelbrotEscapeFill(mode, fx, fy, fzoom);
-    let bestScore = Math.abs(bestEscape - MANDEL_ESCAPE_TARGET)
-      + Math.max(0, MANDEL_ESCAPE_MIN - bestEscape) * 2.4;
-
-    for (let i = 0; i < attempts; i++) {
-      const jitter = spread * (0.7 + i * 0.15) + fzoom * 0.08;
-      const testFx = fx + rand(-jitter, jitter);
-      const testFy = fy + rand(-jitter, jitter);
-      const testZoom = clamp(fzoom * (0.72 + Math.random() * 0.74), zoomMin, zoomMax);
-      const escape = estimateMandelbrotEscapeFill(mode, testFx, testFy, testZoom);
-      const score = Math.abs(escape - MANDEL_ESCAPE_TARGET)
-        + Math.max(0, MANDEL_ESCAPE_MIN - escape) * 2.4;
-      if (score < bestScore) {
-        bestScore = score;
-        bestFx = testFx;
-        bestFy = testFy;
-        bestZoom = testZoom;
-        bestEscape = escape;
-        if (escape >= MANDEL_ESCAPE_MIN && Math.abs(escape - MANDEL_ESCAPE_TARGET) < 0.06) break;
-      }
-    }
-
-    return { fx: bestFx, fy: bestFy, fzoom: bestZoom, escape: bestEscape };
+  function tuneMandelbrotView(mode, fx, fy, fzoom, spread, attempts = fractaloidViewfitSystem.mandelViewAttempts, zoomMin, zoomMax) {
+    return fractaloidViewfitSystem.tuneMandelbrotView(mode, fx, fy, fzoom, spread, attempts, zoomMin, zoomMax);
   }
 
   function deriveMandelZoomFloorRatio(mode, fx, fy, baseFzoom) {
-    let floor = MANDEL_ZOOM_FLOOR_STEPS[0];
-    for (const ratio of MANDEL_ZOOM_FLOOR_STEPS) {
-      const escape = estimateMandelbrotEscapeFill(mode, fx, fy, baseFzoom * ratio);
-      if (escape >= MANDEL_ESCAPE_MIN) {
-        floor = ratio;
-      } else {
-        break;
-      }
-    }
-    return floor;
+    return fractaloidViewfitSystem.deriveMandelZoomFloorRatio(mode, fx, fy, baseFzoom);
   }
 
-  function estimateJuliaVisualFill(jx, jy, fx, fy, fzoom) {
-    let alphaSum = 0;
-    let sampleCount = 0;
-    const grid = JULIA_AREA_SAMPLE_GRID;
-    const maxIter = JULIA_AREA_MAX_ITER;
-
-    for (let gy = 0; gy < grid; gy++) {
-      const y = ((gy + 0.5) / grid) * 2 - 1;
-      for (let gx = 0; gx < grid; gx++) {
-        const x = ((gx + 0.5) / grid) * 2 - 1;
-        const r = Math.hypot(x, y);
-        if (r > 1.22) continue;
-
-        const sx = fx + x * fzoom;
-        const sy = fy + y * fzoom;
-        let zx = sx;
-        let zy = sy;
-        let iBreak = maxIter;
-        for (let i = 0; i < maxIter; i++) {
-          const x2 = zx * zx - zy * zy + jx;
-          const y2 = 2 * zx * zy + jy;
-          zx = x2;
-          zy = y2;
-          if (zx * zx + zy * zy > 4) {
-            iBreak = i;
-            break;
-          }
-        }
-
-        const iterRatio = iBreak / maxIter;
-        const boundaryBand = smoothstep(0.36, 0.78, iterRatio) * (1 - smoothstep(0.88, 0.997, iterRatio));
-        const interior = iBreak >= (maxIter - 1) ? 1 : 0;
-        const radialFade = smoothstep(1.22, 0.88, r);
-        const filament = 0.65 + 0.35 * Math.sin((sx - sy) * 18 + jx * 2.4 + jy * 3.1);
-        const interiorGate = 0.08 + 0.20 * Math.max(0, Math.min(1, filament));
-        const alpha = Math.max(boundaryBand * 1.35, interior * interiorGate) * radialFade;
-        alphaSum += alpha;
-        sampleCount++;
-      }
-    }
-
-    if (sampleCount === 0) return 0.45;
-    return alphaSum / sampleCount;
-  }
-
-  function tuneJuliaView(jx, jy, fx, fy, fzoom, attempts = JULIA_VIEW_ATTEMPTS) {
-    let bestFx = fx;
-    let bestFy = fy;
-    let bestZoom = fzoom;
-    let bestFill = estimateJuliaVisualFill(jx, jy, fx, fy, fzoom);
-
-    if (bestFill >= JULIA_VISIBLE_FILL_MIN) {
-      return { fx: bestFx, fy: bestFy, fzoom: bestZoom, fill: bestFill };
-    }
-
-    for (let i = 0; i < attempts; i++) {
-      const jitter = fzoom * (0.42 + i * 0.05);
-      const testFx = fx + rand(-jitter, jitter);
-      const testFy = fy + rand(-jitter, jitter);
-      const testZoom = clamp(fzoom * (0.66 + Math.random() * 0.78), JULIA_ZOOM_MIN, JULIA_ZOOM_MAX);
-      const fill = estimateJuliaVisualFill(jx, jy, testFx, testFy, testZoom);
-      if (fill > bestFill) {
-        bestFill = fill;
-        bestFx = testFx;
-        bestFy = testFy;
-        bestZoom = testZoom;
-        if (bestFill >= JULIA_VISIBLE_FILL_MIN) break;
-      }
-    }
-
-    return { fx: bestFx, fy: bestFy, fzoom: bestZoom, fill: bestFill };
+  function tuneJuliaView(jx, jy, fx, fy, fzoom, attempts = fractaloidViewfitSystem.juliaViewAttempts) {
+    return fractaloidViewfitSystem.tuneJuliaView(jx, jy, fx, fy, fzoom, attempts);
   }
 
   function getJuliaAreaScale(jx, jy, fx, fy, fzoom) {
-    const key = Math.round(jx * 220) + ':' + Math.round(jy * 220) + ':' + Math.round(fx * 180) + ':' + Math.round(fy * 180) + ':' + Math.round(fzoom * 110);
-    const cached = juliaAreaScaleCache.get(key);
-    if (cached != null) return cached;
+    return fractaloidViewfitSystem.getJuliaAreaScale(jx, jy, fx, fy, fzoom);
+  }
 
-    const fill = Math.max(0.0001, estimateJuliaVisualFill(jx, jy, fx, fy, fzoom));
-    if (fill < JULIA_VISIBLE_FILL_MIN * 0.6) {
-      juliaAreaScaleCache.set(key, JULIA_SHAPE_SCALE_FAILSAFE);
-      return JULIA_SHAPE_SCALE_FAILSAFE;
-    }
-
-    const clampedFill = Math.max(0.08, fill);
-    const rawScale = Math.sqrt(JULIA_AREA_TARGET_FILL / clampedFill);
-    const blended = 1 + (rawScale - 1) * JULIA_AREA_SCALE_BLEND;
-    const finalScale = clamp(blended, JULIA_AREA_MIN_SCALE, JULIA_AREA_MAX_SCALE);
-    juliaAreaScaleCache.set(key, finalScale);
-    return finalScale;
+  function centerFractaloidView(mode, jx, jy, fx, fy, fzoom) {
+    return fractaloidViewfitSystem.centerFractaloidView(mode, jx, jy, fx, fy, fzoom);
   }
 
   function makeWaveProfile(w) {
@@ -1144,7 +953,7 @@
         fy,
         fzoom,
         spread,
-        MANDEL_VIEW_ATTEMPTS,
+        fractaloidViewfitSystem.mandelViewAttempts,
         classSpec.zoomMin,
         classSpec.zoomMax
       );
@@ -1219,7 +1028,7 @@
     );
     let mZoomFloorRatio = parent.mZoomFloorRatio != null ? parent.mZoomFloorRatio : null;
     if (isJulia) {
-      const tuned = tuneJuliaView(julia.jx, julia.jy, fx, fy, fzoom, JULIA_VIEW_ATTEMPTS + 4);
+      const tuned = tuneJuliaView(julia.jx, julia.jy, fx, fy, fzoom, fractaloidViewfitSystem.juliaViewAttempts + 4);
       fx = tuned.fx;
       fy = tuned.fy;
       fzoom = tuned.fzoom;
@@ -1231,7 +1040,7 @@
         fy,
         fzoom,
         parentSpan * 0.24,
-        MANDEL_VIEW_ATTEMPTS + 3,
+        fractaloidViewfitSystem.mandelViewAttempts + 3,
         classSpec.zoomMin,
         classSpec.zoomMax
       );
@@ -1292,9 +1101,15 @@
     const growthMax = FRACTALOID_GROWTH_SCALE[sizeKey] * profile.growthMul * rand(1.02, 1.13);
     const lifeSpan = (FRACTALOID_GROWTH_LIFE[sizeKey] * rand(0.9, 1.12)) / profile.growthRate;
     const baseFzoom = fractal.fzoom;
+    const initialZoomScale = Math.max(growthStart, 0.0001);
+    const initialFzoom = baseFzoom / initialZoomScale;
     const zoomRate = profile.zoomRate * rand(0.9, 1.1);
     const maxHp = options.hp || (isBoss ? BOSS_BASE_HP + Math.floor(wave / BOSS_WAVE_INTERVAL) : 1);
-    const seedCycleRate = options.seedCycleRate || (isBoss ? 0.29 + wave * 0.01 : rand(0.003, 0.018));
+    const seedCycleRate = options.seedCycleRate || (
+      isBoss
+        ? 0.29 + wave * 0.01
+        : (FRACTALOID_COLORIZER_ENHANCED ? rand(0.012, 0.065) : rand(0.003, 0.018))
+    );
     return {
       x: x + rand(-jitter, jitter),
       y: y + rand(-jitter, jitter),
@@ -1321,7 +1136,7 @@
       fx: fractal.fx,
       fy: fractal.fy,
       baseFzoom,
-      fzoom: isJuliaMode(fractal.mode) ? baseFzoom * 1.08 : baseFzoom,
+      fzoom: initialFzoom,
       fseed: fractal.fseed,
       frot: fractal.frot,
       className: fractal.className || getFractaloidClassByMode(fractal.mode),
@@ -1386,72 +1201,36 @@
   }
 
   function drawFractaloid(a) {
-    if (!shouldDrawFractaloidPerimeter(a)) return;
-    ctx.save();
-    ctx.translate(a.x, a.y);
-    ctx.rotate(a.angle);
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = 'round';
-    const scale = a.baseR ? a.r / a.baseR : 1;
-    ctx.scale(scale, scale);
-    ctx.beginPath();
-    for (let i = 0; i < a.verts.length; i++) {
-      const v = a.verts[i];
-      const px = Math.cos(v.a) * v.d;
-      const py = Math.sin(v.a) * v.d;
-      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.stroke();
-    ctx.restore();
+    if (!fractaloidRuntimeSystem) return;
+    fractaloidRuntimeSystem.drawFractaloidPerimeter(ctx, a, shouldDrawFractaloidPerimeter(a));
   }
 
   function drawFractaloids(timeSec, warpBullets = []) {
-    const perimeterOn = FRACTALOID_PERIMETER_MODE === 'polygon';
-    if (fractalRenderer) {
-      fractalRenderer.render(fractaloids, timeSec, DPR, warpBullets, {
-        perimeterOn,
-        chromaTweak: FRACTALOID_CHROMA_TWEAK,
-        neonTweak: FRACTALOID_NEON_TWEAK
-      });
-      if (perimeterOn) {
-        for (const a of fractaloids) drawFractaloid(a);
-      }
-      for (const a of fractaloids) fractaloidEffects.drawSpawnTelegraph(a, timeSec);
-      return;
-    }
-    for (const a of fractaloids) drawFractaloid(a);
-    for (const a of fractaloids) fractaloidEffects.drawSpawnTelegraph(a, timeSec);
+    if (!fractaloidRuntimeSystem) return;
+    fractaloidRuntimeSystem.drawFractaloids({
+      ctx,
+      fractaloids,
+      timeSec,
+      warpBullets,
+      dpr: DPR,
+      fractalRenderer,
+      fractaloidEffects,
+      perimeterMode: FRACTALOID_PERIMETER_MODE,
+      colorizerMode: FRACTALOID_COLORIZER_MODE,
+      enhancedLiftMix: FRACTALOID_ENHANCED_LIFTMIX,
+      chromaTweak: FRACTALOID_CHROMA_TWEAK,
+      neonTweak: FRACTALOID_NEON_TWEAK,
+      drawPerimeter: (a) => drawFractaloid(a)
+    });
   }
 
   function updateFractaloid(a, dt) {
-    a.x += a.vx * dt;
-    a.y += a.vy * dt;
-    a.angle += a.spin * dt;
-    a.age += dt;
-    const lifeT = a.age / Math.max(0.0001, a.lifeSpan);
-    const growthSpan = Math.max(0.0001, a.growthMax - a.growthStart);
-    const scale = a.growthStart + growthSpan * lifeT;
-    a.r = a.baseR * scale;
-    const zoomScale = Math.max(scale, 0.0001);
-    if (isJuliaMode(a.mode)) {
-      // Julia keeps drilling inward as it grows.
-      a.fzoom = a.baseFzoom / zoomScale;
-    } else {
-      // Non-Julia co-zooms outward with world growth so the original segment remains contained.
-      a.fzoom = a.baseFzoom * zoomScale;
-    }
-    const hpT = a.maxHp > 1 ? (1 - a.hp / a.maxHp) : 0;
-    const growthForCycle = Math.min(1, lifeT);
-    const cycleBoost = a.isBoss ? (1.4 + hpT * 2.8 + growthForCycle * 1.7) : 1;
-    a.fseed = fract(a.fseed + dt * a.seedCycleRate * cycleBoost);
-    a.spawnTelegraphAge += dt;
-    wrap(a);
+    if (!fractaloidRuntimeSystem) return;
+    fractaloidRuntimeSystem.updateFractaloid(a, dt, { wrap, isJuliaMode, fract });
   }
 
   function clampDiveZoom(v) {
-    return clamp(v, FRACTAL_DIVE_MIN_ZOOM, FRACTAL_DIVE_MAX_ZOOM);
+    return fractaloidRuntimeSystem ? fractaloidRuntimeSystem.clampDiveZoom(v) : v;
   }
 
   function randomizeFractalDiveTarget(target) {
@@ -1474,82 +1253,57 @@
   }
 
   function enterFractalDive(target, hitPoint = null, opts = null) {
-    if (!target) return;
+    if (!target || !fractaloidRuntimeSystem) return;
     const options = opts || {};
-    if (options.randomizeClass) randomizeFractalDiveTarget(target);
-    state = 'fractaldive';
-    const baseDisplayR = Math.max(target.r, target.baseR * 2.2);
-    const maxDisplayR = Math.min(Math.min(W, H) * 0.43, target.baseR * 4.8);
-    fractalDive = {
-      target,
+    const entered = fractaloidRuntimeSystem.enterDive(target, {
       hitPoint,
-      fx0: target.fx,
-      fy0: target.fy,
-      zoom: clampDiveZoom(target.fzoom * 0.92),
-      panX: 0,
-      panY: 0,
-      displayR: Math.max(baseDisplayR, maxDisplayR),
-      age: 0
-    };
-    target.vx = 0;
-    target.vy = 0;
-    target.spin = 0;
+      width: W,
+      height: H,
+      randomizeClass: !!options.randomizeClass,
+      randomizeClassFn: randomizeFractalDiveTarget
+    });
+    if (entered) state = 'fractaldive';
   }
 
   function maybeEnterFractalDive(target, hitPoint = null) {
-    if (!target) return false;
-    if (state !== 'playing') return false;
-    if (fractaloids.length !== 1 || fractaloids[0] !== target) return false;
-    if (target.hp > 1 || target.sizeKey !== 1) return false;
-    const manualTrigger = wave >= FRACTAL_DIVE_MIN_WAVE && keys.inspectMod && keys.fire;
-    const autoTrigger = wave >= FRACTAL_DIVE_AUTO_WAVE_INTERVAL && (wave % FRACTAL_DIVE_AUTO_WAVE_INTERVAL === 0);
-    if (!manualTrigger && !autoTrigger) return false;
-    enterFractalDive(target, hitPoint, { randomizeClass: autoTrigger && !manualTrigger });
-    return true;
+    if (!fractaloidRuntimeSystem) return false;
+    const entered = fractaloidRuntimeSystem.maybeEnterDive({
+      target,
+      hitPoint,
+      state,
+      wave,
+      keys,
+      fractaloids,
+      minWave: FRACTAL_DIVE_MIN_WAVE,
+      autoDiveWaveInterval: FRACTAL_DIVE_AUTO_WAVE_INTERVAL,
+      randomizeClassFn: randomizeFractalDiveTarget,
+      width: W,
+      height: H
+    });
+    if (entered) state = 'fractaldive';
+    return entered;
   }
 
   function updateFractalDive(dt) {
-    if (!fractalDive || !fractalDive.target) return;
-    const d = fractalDive;
-    const a = d.target;
-    d.age += dt;
-    const centerEase = Math.min(1, dt * 5.5);
-    a.x += (W * 0.5 - a.x) * centerEase;
-    a.y += (H * 0.5 - a.y) * centerEase;
-    a.angle += dt * 0.08;
-    a.r += (d.displayR - a.r) * Math.min(1, dt * 3.5);
-    if (d.age < 1.2) {
-      d.zoom = clampDiveZoom(d.zoom * Math.pow(0.992, dt * 60));
-    }
-    a.fzoom = clampDiveZoom(d.zoom);
-    a.fx = d.fx0 + d.panX;
-    a.fy = d.fy0 + d.panY;
-    a.spawnTelegraphAge = a.spawnTelegraphLife;
+    if (!fractaloidRuntimeSystem) return;
+    fractaloidRuntimeSystem.updateDive(dt, W, H);
   }
 
   function drawFractalDiveOverlay() {
-    ctx.save();
-    ctx.fillStyle = 'rgba(8, 14, 28, 0.72)';
-    ctx.fillRect(14, H - 108, Math.min(720, W - 28), 92);
-    ctx.strokeStyle = 'rgba(142, 190, 255, 0.55)';
-    ctx.strokeRect(14.5, H - 107.5, Math.min(720, W - 29), 91);
-    ctx.fillStyle = '#d7e9ff';
-    ctx.font = '16px "VT323", monospace';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText('Fractal Dive: arrows pan • Q/E zoom • wheel zoom • ESC return', 24, H - 98);
-    ctx.fillStyle = '#8ebdff';
-    ctx.fillText(`Auto every ${FRACTAL_DIVE_AUTO_WAVE_INTERVAL} waves (random class) • or Alt/Ctrl + Fire on final kill`, 24, H - 74);
-    ctx.restore();
+    if (!fractaloidRuntimeSystem) return;
+    fractaloidRuntimeSystem.drawDiveOverlay(ctx, W, H, FRACTAL_DIVE_AUTO_WAVE_INTERVAL);
   }
 
   function exitFractalDive() {
-    if (!fractalDive || !fractalDive.target) {
-      fractalDive = null;
+    if (!fractaloidRuntimeSystem) {
       state = 'playing';
       return;
     }
-    const a = fractalDive.target;
+    const a = fractaloidRuntimeSystem.consumeDiveTarget();
+    if (!a) {
+      state = 'playing';
+      return;
+    }
     const idx = fractaloids.indexOf(a);
     if (idx >= 0) fractaloids.splice(idx, 1);
     spawnShockwave(a.x, a.y, a.r, a.fseed || 0);
@@ -1557,7 +1311,6 @@
     checkExtraLife();
     sfx.bangSmall();
     explode(a.x, a.y, 10, 0.75);
-    fractalDive = null;
     if (fractaloids.length === 0) {
       state = 'wavebreak';
       stateTimer = 2.0;
@@ -1573,419 +1326,101 @@
   }
 
   function damageFractaloid(a, hitPoint, grantScore) {
-    if (a.hp > 1) {
-      a.hp -= 1;
-      a.fseed = fract(a.fseed + 0.14 + Math.random() * 0.2);
-      a.age = Math.min(a.lifeSpan, a.age + a.lifeSpan * 0.08);
-      spawnShockwave(a.x, a.y, a.r * 0.66, a.fseed || 0);
-      explode(a.x, a.y, 8, 0.45);
-      if (grantScore) score += Math.max(8, Math.floor((FRACTALOID_SCORE[a.sizeKey] || 40) * 0.12));
-      return false;
-    }
-
-    splitFractaloid(a, hitPoint, grantScore);
-    return true;
+    if (!fractaloidCombatSystem) return false;
+    return fractaloidCombatSystem.damageFractaloid(a, hitPoint, grantScore, {
+      wave,
+      fractaloids,
+      makeFractaloid,
+      spawnShockwave,
+      explode,
+      sfx,
+      fract,
+      awardFractaloidScore,
+      addRawScore: (points) => { score += points; }
+    });
   }
 
   function splitFractaloid(a, hitPoint = null, grantScore = true) {
-    spawnShockwave(a.x, a.y, a.r, a.fseed || 0);
-    if (grantScore) awardFractaloidScore(FRACTALOID_SCORE[a.sizeKey]);
-    if (a.sizeKey === 4) {
-      sfx.bangLarge();
-      explode(a.x, a.y, 30, 1.9);
-      spawnShockwave(a.x, a.y, a.r * 1.2, a.fseed || 0);
-      for (let i = 0; i < 3; i++) {
-        fractaloids.push(makeFractaloid(a.x, a.y, 3, wave * 6.2, a, hitPoint));
-      }
-      for (let i = 0; i < 2; i++) {
-        fractaloids.push(makeFractaloid(a.x, a.y, 2, wave * 6.8, a, hitPoint));
-      }
-    } else if (a.sizeKey === 3) {
-      sfx.bangLarge();
-      explode(a.x, a.y, 14, 1.0);
-      fractaloids.push(makeFractaloid(a.x, a.y, 2, wave * 4, a, hitPoint));
-      fractaloids.push(makeFractaloid(a.x, a.y, 2, wave * 4, a, hitPoint));
-    } else if (a.sizeKey === 2) {
-      sfx.bangMedium();
-      explode(a.x, a.y, 10, 0.8);
-      fractaloids.push(makeFractaloid(a.x, a.y, 1, wave * 4, a, hitPoint));
-      fractaloids.push(makeFractaloid(a.x, a.y, 1, wave * 4, a, hitPoint));
-    } else {
-      sfx.bangSmall();
-      explode(a.x, a.y, 8, 0.6);
-    }
+    if (!fractaloidCombatSystem) return;
+    fractaloidCombatSystem.splitFractaloid(a, hitPoint, grantScore, {
+      wave,
+      fractaloids,
+      makeFractaloid,
+      spawnShockwave,
+      explode,
+      sfx,
+      fract,
+      awardFractaloidScore,
+      addRawScore: (points) => { score += points; }
+    });
   }
 
   // ============================================================
-  // SAUCER (UFO)
+  // GAMEPLAY SYSTEMS (saucer, particles, bullets, collisions)
   // ============================================================
   function spawnSaucer() {
-    // small saucer more likely as score climbs
-    const isSmall = score > 10000 || Math.random() < Math.min(0.4 + score/30000, 0.7);
-    const cfg = isSmall ? SAUCER_SMALL : SAUCER_LARGE;
-    const fromLeft = Math.random() < 0.5;
-    saucer = {
-      x: fromLeft ? -30 : W + 30,
-      y: rand(60, H - 60),
-      vx: (fromLeft ? 1 : -1) * cfg.speed,
-      vy: 0,
-      r: cfg.r,
-      isSmall,
-      cfg,
-      fireTimer: cfg.fireRate * 0.6,
-      directionTimer: rand(1.5, 3),
-      shapeClass: resolveSaucerFractalClass()
-    };
+    if (!gameplaySystems) return;
+    gameplaySystems.spawnSaucer();
   }
 
   function updateSaucer(dt) {
-    if (!saucer) return;
-    saucer.x += saucer.vx * dt;
-    saucer.y += saucer.vy * dt;
-
-    saucer.directionTimer -= dt;
-    if (saucer.directionTimer <= 0) {
-      // change vertical direction occasionally
-      saucer.vy = randSign() * saucer.cfg.speed * 0.5;
-      saucer.directionTimer = rand(1.2, 2.5);
-    }
-    if (saucer.y < 30) saucer.vy = Math.abs(saucer.vy);
-    if (saucer.y > H - 30) saucer.vy = -Math.abs(saucer.vy);
-
-    // off-screen horizontally => done
-    if (saucer.vx > 0 && saucer.x > W + 40) saucer = null;
-    else if (saucer.vx < 0 && saucer.x < -40) saucer = null;
-    if (!saucer) return;
-
-    saucer.fireTimer -= dt;
-    if (saucer.fireTimer <= 0 && ship && ship.alive) {
-      saucerFire();
-      saucer.fireTimer = saucer.cfg.fireRate;
-    }
-  }
-
-  function saucerFire() {
-    let angle;
-    if (saucer.cfg.accuracy > 0 && ship && ship.alive) {
-      // lead the ship a little
-      const dx = ship.x - saucer.x, dy = ship.y - saucer.y;
-      angle = Math.atan2(dy, dx);
-      // jitter based on accuracy
-      angle += (1 - saucer.cfg.accuracy) * (Math.random() - 0.5) * Math.PI;
-    } else {
-      angle = Math.random() * Math.PI * 2;
-    }
-    saucerBullets.push({
-      x: saucer.x, y: saucer.y,
-      vx: Math.cos(angle) * BULLET_SPEED * 0.85,
-      vy: Math.sin(angle) * BULLET_SPEED * 0.85,
-      life: 1.0,
-      r: 1.5
-    });
-    sfx.saucerFire();
-  }
-
-  function drawKochSegment(x1, y1, x2, y2, depth) {
-    if (depth <= 0) {
-      ctx.lineTo(x2, y2);
-      return;
-    }
-    const dx = (x2 - x1) / 3;
-    const dy = (y2 - y1) / 3;
-    const ax = x1 + dx;
-    const ay = y1 + dy;
-    const bx = x1 + dx * 2;
-    const by = y1 + dy * 2;
-    const px = ax + dx * 0.5 - dy * 0.86602540378;
-    const py = ay + dy * 0.5 + dx * 0.86602540378;
-
-    drawKochSegment(x1, y1, ax, ay, depth - 1);
-    drawKochSegment(ax, ay, px, py, depth - 1);
-    drawKochSegment(px, py, bx, by, depth - 1);
-    drawKochSegment(bx, by, x2, y2, depth - 1);
-  }
-
-  function drawKochSnowflake(radius, depth) {
-    const p1 = { x: 0, y: -radius };
-    const p2 = { x: -radius * 0.866, y: radius * 0.5 };
-    const p3 = { x: radius * 0.866, y: radius * 0.5 };
-
-    ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    drawKochSegment(p1.x, p1.y, p2.x, p2.y, depth);
-    drawKochSegment(p2.x, p2.y, p3.x, p3.y, depth);
-    drawKochSegment(p3.x, p3.y, p1.x, p1.y, depth);
-    ctx.closePath();
-    ctx.stroke();
+    if (!gameplaySystems) return;
+    gameplaySystems.updateSaucer(dt);
   }
 
   function drawSaucer() {
-    if (!saucer) return;
-    ctx.save();
-    ctx.translate(saucer.x, saucer.y);
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    const r = saucer.r;
-    const saucerClass = saucer.shapeClass || 'classic';
-    if (saucerClass === 'sierpinski') {
-      const s = r * 1.08;
-      const depth = saucer.isSmall ? 2 : 3;
-      drawSierpinski(0, -s * 0.84, -s * 0.92, s * 0.72, s * 0.92, s * 0.72, depth);
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.48, r * 0.22);
-      ctx.lineTo(r * 0.48, r * 0.22);
-      ctx.stroke();
-    } else if (saucerClass === 'koch') {
-      const depth = saucer.isSmall ? 1 : 2;
-      drawKochSnowflake(r * 0.94, depth);
-      ctx.beginPath();
-      ctx.arc(0, r * 0.08, r * 0.2, 0, Math.PI * 2);
-      ctx.stroke();
-    } else {
-      // classic vector ufo
-      ctx.beginPath();
-      ctx.moveTo(-r, 0);
-      ctx.lineTo(-r * 0.5, -r * 0.4);
-      ctx.lineTo(r * 0.5, -r * 0.4);
-      ctx.lineTo(r, 0);
-      ctx.lineTo(r * 0.5, r * 0.4);
-      ctx.lineTo(-r * 0.5, r * 0.4);
-      ctx.closePath();
-      ctx.moveTo(-r, 0);
-      ctx.lineTo(r, 0);
-      // dome
-      ctx.moveTo(-r * 0.5, -r * 0.4);
-      ctx.lineTo(-r * 0.25, -r * 0.75);
-      ctx.lineTo(r * 0.25, -r * 0.75);
-      ctx.lineTo(r * 0.5, -r * 0.4);
-      ctx.stroke();
-    }
-    ctx.restore();
+    if (!gameplaySystems) return;
+    gameplaySystems.drawSaucer();
   }
 
-  // ============================================================
-  // PARTICLES (explosions, debris)
-  // ============================================================
   function explode(x, y, count, scale = 1) {
-    for (let i = 0; i < count; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const sp = rand(40, 180) * scale;
-      particles.push({
-        x, y,
-        vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp,
-        life: rand(0.4, 1.0) * scale,
-        maxLife: 1,
-        size: rand(1, 2.5)
-      });
-    }
+    if (!gameplaySystems) return;
+    gameplaySystems.explode(x, y, count, scale);
   }
 
   function spawnShockwave(x, y, sourceRadius, seed = 0) {
-    const r0 = Math.max(10, sourceRadius * 0.62);
-    const r1 = r0 + sourceRadius * SHOCKWAVE_RADIUS_GAIN;
-    shockwaves.push({
-      x,
-      y,
-      r0,
-      r1,
-      age: 0,
-      life: SHOCKWAVE_LIFE * rand(0.92, 1.08),
-      phase: Math.random() * Math.PI * 2,
-      seed
-    });
-  }
-
-  function drawShockwaveRing(w, radius, alpha, width, harmonicScale) {
-    const points = 84;
-    ctx.beginPath();
-    for (let i = 0; i <= points; i++) {
-      const t = i / points;
-      const a = t * Math.PI * 2;
-      const jitter = 1 + Math.sin(a * 6 + w.phase) * 0.05 + Math.sin(a * 11 + w.seed * 9) * 0.025;
-      const x = w.x + Math.cos(a) * radius * jitter;
-      const y = w.y + Math.sin(a) * radius * jitter;
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
-    ctx.globalAlpha = alpha;
-    ctx.lineWidth = width;
-    ctx.strokeStyle = `hsl(${38 + w.seed * 84}, 92%, ${62 + harmonicScale * 14}%)`;
-    ctx.stroke();
+    if (!gameplaySystems) return;
+    gameplaySystems.spawnShockwave(x, y, sourceRadius, seed);
   }
 
   function updateParticles(dt) {
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i];
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.life -= dt;
-      if (p.life <= 0) particles.splice(i, 1);
-    }
+    if (!gameplaySystems) return;
+    gameplaySystems.updateParticles(dt);
   }
 
   function updateShockwaves(dt) {
-    for (let i = shockwaves.length - 1; i >= 0; i--) {
-      const w = shockwaves[i];
-      w.age += dt;
-      if (w.age >= w.life) {
-        shockwaves.splice(i, 1);
-      }
-    }
+    if (!gameplaySystems) return;
+    gameplaySystems.updateShockwaves(dt);
   }
 
   function drawParticles() {
-    ctx.fillStyle = '#fff';
-    for (const p of particles) {
-      ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
-      ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
-    }
-    ctx.globalAlpha = 1;
+    if (!gameplaySystems) return;
+    gameplaySystems.drawParticles();
   }
 
   function drawShockwaves() {
-    if (shockwaves.length === 0) return;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (const w of shockwaves) {
-      const t = Math.min(1, w.age / w.life);
-      const eased = 1 - Math.pow(1 - t, 2.2);
-      const radius = w.r0 + (w.r1 - w.r0) * eased;
-      const fade = Math.max(0, 1 - t);
-
-      drawShockwaveRing(w, radius, fade * 0.42, SHOCKWAVE_WIDTH, 0.2);
-      drawShockwaveRing(w, radius * 0.74, fade * 0.22, SHOCKWAVE_WIDTH * 0.58, 0.55);
-    }
-    ctx.restore();
-    ctx.globalAlpha = 1;
+    if (!gameplaySystems) return;
+    gameplaySystems.drawShockwaves();
   }
 
-  // ============================================================
-  // BULLETS
-  // ============================================================
   function updateBullets(dt) {
-    for (let i = bullets.length - 1; i >= 0; i--) {
-      const b = bullets[i];
-      b.x += b.vx * dt;
-      b.y += b.vy * dt;
-      b.life -= dt;
-      // wrap bullets too (classic)
-      if (b.x < 0) b.x += W;
-      if (b.x > W) b.x -= W;
-      if (b.y < 0) b.y += H;
-      if (b.y > H) b.y -= H;
-      if (b.life <= 0) bullets.splice(i, 1);
-    }
-    for (let i = saucerBullets.length - 1; i >= 0; i--) {
-      const b = saucerBullets[i];
-      b.x += b.vx * dt;
-      b.y += b.vy * dt;
-      b.life -= dt;
-      if (b.x < 0) b.x += W;
-      if (b.x > W) b.x -= W;
-      if (b.y < 0) b.y += H;
-      if (b.y > H) b.y -= H;
-      if (b.life <= 0) saucerBullets.splice(i, 1);
-    }
+    if (!gameplaySystems) return;
+    gameplaySystems.updateBullets(dt);
   }
 
   function drawBullets() {
-    ctx.fillStyle = '#fff';
-    for (const b of bullets) ctx.fillRect(b.x - 1.5, b.y - 1.5, 3, 3);
-    for (const b of saucerBullets) {
-      const t = 1 - b.life;
-      ctx.fillStyle = `hsl(${280 + t * 70}, 95%, ${62 - t * 14}%)`;
-      ctx.fillRect(b.x - 1.9, b.y - 1.9, 3.8, 3.8);
-    }
+    if (!gameplaySystems) return;
+    gameplaySystems.drawBullets();
   }
 
-  // ============================================================
-  // COLLISIONS
-  // ============================================================
   function checkCollisions() {
-    // bullets vs fractaloids
-    for (let i = bullets.length - 1; i >= 0; i--) {
-      const b = bullets[i];
-      for (let j = fractaloids.length - 1; j >= 0; j--) {
-        const a = fractaloids[j];
-        if (dist2(b, a) < a.r * a.r) {
-          if (maybeEnterFractalDive(a, b)) {
-            bullets.splice(i, 1);
-            break;
-          }
-          bullets.splice(i, 1);
-          const destroyed = damageFractaloid(a, b, true);
-          if (destroyed) fractaloids.splice(j, 1);
-          checkExtraLife();
-          break;
-        }
-      }
-    }
-    // bullets vs saucer
-    if (saucer) {
-      for (let i = bullets.length - 1; i >= 0; i--) {
-        const b = bullets[i];
-        if (dist2(b, saucer) < saucer.r * saucer.r) {
-          bullets.splice(i, 1);
-          score += saucer.cfg.score;
-          explode(saucer.x, saucer.y, 16, 1.0);
-          sfx.bangMedium();
-          saucer = null;
-          checkExtraLife();
-          break;
-        }
-      }
-    }
-    // ship vs fractaloids
-    if (ship && ship.alive && ship.invuln <= 0) {
-      for (const a of fractaloids) {
-        if (dist2(ship, a) < (a.r + ship.r) * (a.r + ship.r)) {
-          const destroyed = damageFractaloid(a, ship, true);
-          if (destroyed) fractaloids.splice(fractaloids.indexOf(a), 1);
-          killShip();
-          return;
-        }
-      }
-      // ship vs saucer
-      if (saucer && dist2(ship, saucer) < (saucer.r + ship.r) * (saucer.r + ship.r)) {
-        explode(saucer.x, saucer.y, 16, 1.0);
-        sfx.bangMedium();
-        saucer = null;
-        killShip();
-        return;
-      }
-      // ship vs saucer bullets
-      for (let i = saucerBullets.length - 1; i >= 0; i--) {
-        const b = saucerBullets[i];
-        if (dist2(ship, b) < (ship.r + b.r) * (ship.r + b.r)) {
-          saucerBullets.splice(i, 1);
-          killShip();
-          return;
-        }
-      }
-    }
-    // saucer bullets vs fractaloids (saucer can break rocks too)
-    for (let i = saucerBullets.length - 1; i >= 0; i--) {
-      const b = saucerBullets[i];
-      for (let j = fractaloids.length - 1; j >= 0; j--) {
-        const a = fractaloids[j];
-        if (dist2(b, a) < a.r * a.r) {
-          saucerBullets.splice(i, 1);
-          const destroyed = damageFractaloid(a, b, false);
-          if (destroyed) fractaloids.splice(j, 1);
-          break;
-        }
-      }
-    }
+    if (!gameplaySystems) return;
+    gameplaySystems.checkCollisions();
   }
 
   function checkExtraLife() {
-    if (score >= nextExtraLife) {
-      lives++;
-      nextExtraLife += 10000;
-      sfx.extraLife();
-    }
+    if (!gameplaySystems) return;
+    gameplaySystems.checkExtraLife();
   }
 
   // ============================================================
@@ -2003,7 +1438,7 @@
     fractaloids = [];
     particles = [];
     shockwaves = [];
-    fractalDive = null;
+    if (fractaloidRuntimeSystem) fractaloidRuntimeSystem.clearDive();
     deathLifeSpent = false;
     inputFeelSystem.reset();
     saucer = null;
@@ -2024,7 +1459,7 @@
 
   function endGame() {
     state = 'gameover';
-    fractalDive = null;
+    if (fractaloidRuntimeSystem) fractaloidRuntimeSystem.clearDive();
     deathLifeSpent = false;
     inputFeelSystem.reset();
     activeThreatCues = [];
@@ -2034,27 +1469,77 @@
     document.getElementById('hud').classList.add('hidden');
   }
 
-  function respawnShip() {
-    // wait until center is clear-ish
-    const center = { x: W/2, y: H/2, r: 60 };
-    let clear = true;
+  function isRespawnSpotSafe(x, y, safeR) {
+    const probe = { x, y };
     for (const a of fractaloids) {
-      if (dist2(center, a) < (a.r + center.r) * (a.r + center.r)) { clear = false; break; }
+      const rr = (a.r + safeR);
+      if (dist2(probe, a) < rr * rr) return false;
     }
-    if (saucer && dist2(center, saucer) < (saucer.r + center.r) * (saucer.r + center.r)) clear = false;
-    if (clear) {
-      for (const b of saucerBullets) {
-        const br = b.r || 2;
-        if (dist2(center, b) < (center.r + br) * (center.r + br)) {
-          clear = false;
-          break;
+    if (saucer) {
+      const rr = (saucer.r + safeR);
+      if (dist2(probe, saucer) < rr * rr) return false;
+    }
+    for (const b of saucerBullets) {
+      const br = b.r || 2;
+      const rr = (br + safeR);
+      if (dist2(probe, b) < rr * rr) return false;
+    }
+    return true;
+  }
+
+  function findRespawnSpot() {
+    const cx = W * 0.5;
+    const cy = H * 0.5;
+    const cycleComplete = hasCompletedFractaloidCycle(wave);
+    const waveProgress = cycleComplete
+      ? Math.max(0, wave - FRACTALOID_CLASS_SEQUENCE.length)
+      : Math.max(0, wave - 6);
+    const relaxT = clamp(waveProgress / 24, 0, 1);
+    const strictR = cycleComplete ? 62 : 66;
+    const minR = cycleComplete ? 34 : 50;
+    const safeR = strictR - (strictR - minR) * relaxT;
+
+    if (isRespawnSpotSafe(cx, cy, safeR)) {
+      return { x: cx, y: cy, relaxed: false };
+    }
+
+    const step = Math.max(18, safeR * 0.52);
+    const maxRadius = Math.hypot(W, H) * 0.52;
+    const rings = Math.max(5, Math.ceil(maxRadius / step));
+    const edgeMargin = Math.max(24, safeR * 0.64);
+
+    for (let ring = 1; ring <= rings; ring++) {
+      const radius = ring * step;
+      const samples = Math.max(12, Math.ceil((Math.PI * 2 * radius) / Math.max(16, step * 0.9)));
+      const phase = ring * 0.37;
+      for (let i = 0; i < samples; i++) {
+        const a = phase + (i / samples) * Math.PI * 2;
+        const x = cx + Math.cos(a) * radius;
+        const y = cy + Math.sin(a) * radius;
+        if (x < edgeMargin || x > W - edgeMargin || y < edgeMargin || y > H - edgeMargin) continue;
+        if (isRespawnSpotSafe(x, y, safeR)) {
+          return { x, y, relaxed: false };
+        }
+        if (cycleComplete && ring > rings * 0.55) {
+          const relaxedR = Math.max(minR * 0.82, safeR * 0.82);
+          if (isRespawnSpotSafe(x, y, relaxedR)) {
+            return { x, y, relaxed: true };
+          }
         }
       }
     }
-    if (clear) {
-      ship = makeShip();
-      state = 'playing';
-    }
+
+    return null;
+  }
+
+  function respawnShip() {
+    const spot = findRespawnSpot();
+    if (!spot) return;
+    ship = makeShip();
+    ship.x = spot.x;
+    ship.y = spot.y;
+    if (spot.relaxed) ship.invuln = Math.max(ship.invuln, 3.2);
+    state = 'playing';
   }
 
   renderBootIssues();
