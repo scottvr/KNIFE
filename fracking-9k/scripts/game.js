@@ -95,6 +95,11 @@
   const IS_ARCADE_640 = RENDER_MODE === 'arcade_640';
   const IS_NATIVE_RENDER = !IS_ARCADE_640;
   const ACTIVE_GLOW_QUALITY = IS_ARCADE_640 ? ARCADE_GLOW_QUALITY : NATIVE_GLOW_QUALITY;
+  const CRT_CLEAR_COLOR = (() => {
+    const root = window.getComputedStyle(document.documentElement);
+    const cssColor = (root.getPropertyValue('--crt-black') || '').trim();
+    return cssColor || '#090e14';
+  })();
   const VECTOR_GLOW_TIERS = {
     high: {
       // Rich arcade-vector look: full halo + body + tight core.
@@ -613,8 +618,8 @@
     { name: 'Needle', focusX: -1.25066, focusY: 0.02012, seedBias: 0.56, spread: 0.62, zoomBase: 1.86 },
     { name: 'Elephant', focusX: 0.285, focusY: 0.012, seedBias: 0.78, spread: 0.72, zoomBase: 1.78 }
   ];
-  const SAUCER_LARGE = { r: 22, score: 200, speed: 90, fireRate: 1.6, accuracy: 0.0 };
-  const SAUCER_SMALL = { r: 21, score: 1000, speed: 130, fireRate: 1.0, accuracy: 0.75 };
+  const SAUCER_LARGE = { r: 24, score: 200, speed: 90, fireRate: 1.6, accuracy: 0.0 };
+  const SAUCER_SMALL = { r: 22, score: 1000, speed: 130, fireRate: 1.0, accuracy: 0.75 };
   gameplaySystems = (window.FrackingGameplaySystems && typeof window.FrackingGameplaySystems.create === 'function')
     ? window.FrackingGameplaySystems.create({
         ctx,
@@ -1876,7 +1881,7 @@
     inputFeelSystem.tick(dt, { active: state === 'playing' && !!ship && ship.alive });
 
     // clear
-    ctx.fillStyle = '#000';
+    ctx.fillStyle = CRT_CLEAR_COLOR;
     ctx.fillRect(0, 0, W, H);
 
     drawStars(totalTime);
