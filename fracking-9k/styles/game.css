@@ -183,7 +183,7 @@
     font-family: 'Press Start 2P', monospace;
     font-size: clamp(14px, 2.5vw, 18px);
     padding: 16px 28px;
-    background: #000;
+    background: #090e14;
     color: #ddd;
     border: 3px solid #ddd;
     cursor: pointer;
@@ -193,7 +193,7 @@
   }
   .btn:hover, .btn:active {
     background: #ddd;
-    color: #000;
+    color: #090e14;
     transform: scale(1.05);
     box-shadow: 0 0 20px #ddd;
   }

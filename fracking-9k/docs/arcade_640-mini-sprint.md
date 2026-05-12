@@ -116,7 +116,7 @@ Ship a selectable `arcade_640` mode that:
 
 7. [x] Task 7 - Tune CRT background black for arcade mode
    - Files: `styles/game.css`
-   - Keep lifted near-black (not pure `#000`) and ensure letterbox areas visually match.
+   - Keep lifted near-black (not pure ``) and ensure letterbox areas visually match.
    - Done when:
      - Borders and playfield feel like one tube/cabinet surface.
 
