@@ -64,6 +64,70 @@
     noteBootWarning('Fractal renderer module missing; using vector fallback.');
   }
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const perfOverlayEnabledByQuery = urlParams.get('perf') === '1' || urlParams.get('perfOverlay') === '1';
+
+  // ============================================================
+  // RENDER MODES (Task 1 scaffolding)
+  // ============================================================
+  const DEFAULT_RENDER_MODE = 'arcade_640';
+  const modeQueryRaw = (urlParams.get('mode') || '').trim().toLowerCase();
+  const modeQuery = modeQueryRaw || DEFAULT_RENDER_MODE;
+  const RENDER_MODE = modeQuery === 'native' ? 'native' : 'arcade_640'; // 'native' | 'arcade_640'
+  if (modeQueryRaw && modeQueryRaw !== 'native' && modeQueryRaw !== 'arcade_640') {
+    console.warn(`[Render mode] Unknown mode "${modeQueryRaw}". Falling back to "${DEFAULT_RENDER_MODE}".`);
+  }
+  const ARCADE_RES_PRESETS = {
+    '640x480': { w: 640, h: 480 },
+    '1024x768': { w: 1024, h: 768 },
+    '1280x960': { w: 1280, h: 960 }
+  };
+  const ARCADE_RES_DEFAULT = '1024x768';
+  const arcadeResQueryRaw = (urlParams.get('arcade_res') || urlParams.get('arcadeRes') || '').trim().toLowerCase();
+  const arcadeResKey = ARCADE_RES_PRESETS[arcadeResQueryRaw] ? arcadeResQueryRaw : ARCADE_RES_DEFAULT;
+  if (arcadeResQueryRaw && !ARCADE_RES_PRESETS[arcadeResQueryRaw]) {
+    console.warn(`[Render mode] Unknown arcade resolution "${arcadeResQueryRaw}". Falling back to "${ARCADE_RES_DEFAULT}".`);
+  }
+  const ARCADE_WIDTH = ARCADE_RES_PRESETS[arcadeResKey].w;
+  const ARCADE_HEIGHT = ARCADE_RES_PRESETS[arcadeResKey].h;
+  const ARCADE_GLOW_QUALITY = 'medium'; // 'low' | 'medium' | 'high'
+  const NATIVE_GLOW_QUALITY = 'high';
+  const IS_ARCADE_640 = RENDER_MODE === 'arcade_640';
+  const IS_NATIVE_RENDER = !IS_ARCADE_640;
+  const ACTIVE_GLOW_QUALITY = IS_ARCADE_640 ? ARCADE_GLOW_QUALITY : NATIVE_GLOW_QUALITY;
+  const VECTOR_GLOW_TIERS = {
+    high: {
+      // Rich arcade-vector look: full halo + body + tight core.
+      haloWidthMulScale: 1.0,
+      haloAlphaScale: 1.0,
+      blurScale: 1.0,
+      bodyWidthMulScale: 1.0,
+      bodyAlphaScale: 1.0,
+      coreWidthMulScale: 1.0,
+      coreAlphaScale: 1.0
+    },
+    medium: {
+      // Performance-oriented: lighter halo with a narrower, crisp core.
+      haloWidthMulScale: 0.9,
+      haloAlphaScale: 0.62,
+      blurScale: 0.68,
+      bodyWidthMulScale: 0.96,
+      bodyAlphaScale: 0.9,
+      coreWidthMulScale: 0.88,
+      coreAlphaScale: 1.05
+    },
+    low: {
+      // Core-first: minimal halo, restrained body, bright center line.
+      haloWidthMulScale: 0.8,
+      haloAlphaScale: 0.22,
+      blurScale: 0.42,
+      bodyWidthMulScale: 0.9,
+      bodyAlphaScale: 0.66,
+      coreWidthMulScale: 1.24,
+      coreAlphaScale: 1.1
+    }
+  };
+
   const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
   if (isMobile) {
     document.body.classList.add('mobile');
@@ -119,23 +183,60 @@
   }
 
   let W = 0, H = 0, DPR = 1;
+  let VIEW_W = 0, VIEW_H = 0;
+  let DISPLAY_SCALE = 1;
+
+  function placeCanvasLayer(layer, x, y, width, height) {
+    if (!layer) return;
+    layer.style.left = x + 'px';
+    layer.style.top = y + 'px';
+    layer.style.right = 'auto';
+    layer.style.bottom = 'auto';
+    layer.style.width = width + 'px';
+    layer.style.height = height + 'px';
+  }
 
   function resize() {
     if (!canvas || !ctx || !fractalCanvas) return;
-    DPR = Math.min(window.devicePixelRatio || 1, 2);
     const wrap = document.getElementById('game-wrap');
     if (!wrap) return;
-    W = wrap.clientWidth;
-    H = wrap.clientHeight;
-    canvas.style.width = W + 'px';
-    canvas.style.height = H + 'px';
-    canvas.width = Math.floor(W * DPR);
-    canvas.height = Math.floor(H * DPR);
-    fractalCanvas.style.width = W + 'px';
-    fractalCanvas.style.height = H + 'px';
-    fractalCanvas.width = Math.floor(W * DPR);
-    fractalCanvas.height = Math.floor(H * DPR);
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const wrapWidth = wrap.clientWidth;
+    const wrapHeight = wrap.clientHeight;
+    VIEW_W = wrapWidth;
+    VIEW_H = wrapHeight;
+    if (IS_ARCADE_640) {
+      DPR = 1;
+      // Task 2 + Task 3: fixed low-res internal buffers with centered integer upscale + letterbox.
+      W = ARCADE_WIDTH;
+      H = ARCADE_HEIGHT;
+      const fitScale = Math.min(wrapWidth / ARCADE_WIDTH, wrapHeight / ARCADE_HEIGHT);
+      const intScale = Math.floor(fitScale);
+      const displayScale = intScale >= 1 ? intScale : Math.max(0.1, fitScale);
+      const displayWidth = Math.max(1, Math.round(ARCADE_WIDTH * displayScale));
+      const displayHeight = Math.max(1, Math.round(ARCADE_HEIGHT * displayScale));
+      const offsetX = Math.floor((wrapWidth - displayWidth) * 0.5);
+      const offsetY = Math.floor((wrapHeight - displayHeight) * 0.5);
+      DISPLAY_SCALE = displayScale;
+      placeCanvasLayer(canvas, offsetX, offsetY, displayWidth, displayHeight);
+      canvas.width = ARCADE_WIDTH;
+      canvas.height = ARCADE_HEIGHT;
+      placeCanvasLayer(fractalCanvas, offsetX, offsetY, displayWidth, displayHeight);
+      fractalCanvas.width = ARCADE_WIDTH;
+      fractalCanvas.height = ARCADE_HEIGHT;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    } else {
+      DPR = Math.min(window.devicePixelRatio || 1, 2);
+      W = wrapWidth;
+      H = wrapHeight;
+      DISPLAY_SCALE = 1;
+      placeCanvasLayer(canvas, 0, 0, W, H);
+      canvas.width = Math.floor(W * DPR);
+      canvas.height = Math.floor(H * DPR);
+      placeCanvasLayer(fractalCanvas, 0, 0, W, H);
+      fractalCanvas.width = Math.floor(W * DPR);
+      fractalCanvas.height = Math.floor(H * DPR);
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
     if (fractalRenderer) {
       fractalRenderer.resize(fractalCanvas.width, fractalCanvas.height);
     }
@@ -221,7 +322,9 @@
 
   function nudgeFractalDive(code, shiftKey = false) {
     if (state !== 'fractaldive' || !fractaloidRuntimeSystem) return false;
-    return fractaloidRuntimeSystem.nudgeDive(code, shiftKey, () => exitFractalDive());
+    return fractaloidRuntimeSystem.nudgeDive(code, shiftKey, () => exitFractalDive(), {
+      displayScale: DISPLAY_SCALE
+    });
   }
 
   window.addEventListener('keydown', (e) => {
@@ -231,9 +334,16 @@
 
   window.addEventListener('wheel', (e) => {
     if (state !== 'fractaldive' || !fractaloidRuntimeSystem || !fractaloidRuntimeSystem.hasDive()) return;
-    fractaloidRuntimeSystem.wheelDive(e.deltaY);
+    fractaloidRuntimeSystem.wheelDive(e.deltaY, { displayScale: DISPLAY_SCALE });
     e.preventDefault();
   }, { passive: false });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'F8' && window.frackingPerf && typeof window.frackingPerf.toggle === 'function') {
+      window.frackingPerf.toggle();
+      e.preventDefault();
+    }
+  });
 
   // ============================================================
   // GAME STATE
@@ -257,6 +367,39 @@
   let waveProfile = null;
   let activeFractaloidClass = 'mandelbrot';
   let deathLifeSpent = false;
+  const perfMetrics = (window.FrackingPerfMetrics && typeof window.FrackingPerfMetrics.create === 'function')
+    ? window.FrackingPerfMetrics.create({
+        overlayVisible: perfOverlayEnabledByQuery,
+        metaProvider: () => ({
+          mode: IS_NATIVE_RENDER ? 'native' : 'arcade_640',
+          glowQuality: ACTIVE_GLOW_QUALITY,
+          arcadeBase: `${ARCADE_WIDTH}x${ARCADE_HEIGHT}`,
+          state,
+          wave,
+          viewport: `${VIEW_W}x${VIEW_H}`,
+          world: `${W}x${H}`,
+          displayScale: DISPLAY_SCALE,
+          render: `${canvas ? canvas.width : 0}x${canvas ? canvas.height : 0}`,
+          dpr: DPR
+        })
+      })
+    : {
+        beginFrame: () => null,
+        endFrame: () => {},
+        startCapture: () => null,
+        stopCapture: () => null,
+        snapshot: () => null,
+        getSnapshots: () => [],
+        getRollingStats: () => ({}),
+        clearSnapshots: () => {},
+        setOverlayVisible: () => {},
+        isOverlayVisible: () => false,
+        bindGlobalApi: () => null
+      };
+  perfMetrics.bindGlobalApi();
+  if (window.frackingPerf && perfOverlayEnabledByQuery) {
+    console.info('[Perf] Overlay enabled. Console API: window.frackingPerf.start(label), stop(), snap(label), stats(), list(), show(), hide(), toggle()');
+  }
   const funPack = (window.FrackingFunPack && typeof window.FrackingFunPack.create === 'function')
     ? window.FrackingFunPack.create()
     : {
@@ -470,8 +613,8 @@
     { name: 'Needle', focusX: -1.25066, focusY: 0.02012, seedBias: 0.56, spread: 0.62, zoomBase: 1.86 },
     { name: 'Elephant', focusX: 0.285, focusY: 0.012, seedBias: 0.78, spread: 0.72, zoomBase: 1.78 }
   ];
-  const SAUCER_LARGE = { r: 21, score: 200, speed: 90, fireRate: 1.6, accuracy: 0.0 };
-  const SAUCER_SMALL = { r: 19, score: 1000, speed: 130, fireRate: 1.0, accuracy: 0.75 };
+  const SAUCER_LARGE = { r: 22, score: 200, speed: 90, fireRate: 1.6, accuracy: 0.0 };
+  const SAUCER_SMALL = { r: 21, score: 1000, speed: 130, fireRate: 1.0, accuracy: 0.75 };
   gameplaySystems = (window.FrackingGameplaySystems && typeof window.FrackingGameplaySystems.create === 'function')
     ? window.FrackingGameplaySystems.create({
         ctx,
@@ -550,17 +693,27 @@
 
   function strokeWithVectorGlow(context, drawStrokePath, opts = {}) {
     if (!context || typeof drawStrokePath !== 'function') return;
+    const tierKeyRaw = typeof opts.glowQuality === 'string' ? opts.glowQuality : ACTIVE_GLOW_QUALITY;
+    const tierKey = tierKeyRaw.toLowerCase();
+    const tier = VECTOR_GLOW_TIERS[tierKey] || VECTOR_GLOW_TIERS.high;
     const baseAlpha = context.globalAlpha;
     const baseWidth = Number.isFinite(opts.baseWidth) ? opts.baseWidth : context.lineWidth;
-    const haloWidthMul = Number.isFinite(opts.haloWidthMul) ? opts.haloWidthMul : 1.85;
-    const haloAlpha = Number.isFinite(opts.haloAlpha) ? opts.haloAlpha : 0.22;
-    const bodyWidthMul = Number.isFinite(opts.bodyWidthMul) ? opts.bodyWidthMul : 1.0;
-    const bodyAlpha = Number.isFinite(opts.bodyAlpha) ? opts.bodyAlpha : 0.58;
-    const coreWidthMul = Number.isFinite(opts.coreWidthMul) ? opts.coreWidthMul : 0.50;
-    const coreAlpha = Number.isFinite(opts.coreAlpha) ? opts.coreAlpha : 1.0;
-    const blur = Number.isFinite(opts.blur) ? opts.blur : 4.8;
+    const haloWidthMulBase = Number.isFinite(opts.haloWidthMul) ? opts.haloWidthMul : 1.85;
+    const haloAlphaBase = Number.isFinite(opts.haloAlpha) ? opts.haloAlpha : 0.22;
+    const bodyWidthMulBase = Number.isFinite(opts.bodyWidthMul) ? opts.bodyWidthMul : 1.0;
+    const bodyAlphaBase = Number.isFinite(opts.bodyAlpha) ? opts.bodyAlpha : 0.58;
+    const coreWidthMulBase = Number.isFinite(opts.coreWidthMul) ? opts.coreWidthMul : 0.50;
+    const coreAlphaBase = Number.isFinite(opts.coreAlpha) ? opts.coreAlpha : 1.0;
+    const blurBase = Number.isFinite(opts.blur) ? opts.blur : 4.8;
+    const haloWidthMul = haloWidthMulBase * tier.haloWidthMulScale;
+    const haloAlpha = haloAlphaBase * tier.haloAlphaScale;
+    const bodyWidthMul = bodyWidthMulBase * tier.bodyWidthMulScale;
+    const bodyAlpha = bodyAlphaBase * tier.bodyAlphaScale;
+    const coreWidthMul = coreWidthMulBase * tier.coreWidthMulScale;
+    const coreAlpha = Math.min(1.25, coreAlphaBase * tier.coreAlphaScale);
+    const blur = blurBase * tier.blurScale;
     const glowEnabled = opts.glowEnabled !== false;
-    const hasHalo = glowEnabled && haloAlpha > 0;
+    const hasHalo = glowEnabled && haloAlpha > 0.0001;
     const path = opts.path || null;
 
     context.save();
@@ -1685,6 +1838,27 @@
     }
   }
 
+  function perfFrameInfo(dt) {
+    return {
+      dtMs: dt * 1000,
+      state,
+      wave,
+      fractaloids: fractaloids.length,
+      bullets: bullets.length,
+      saucerBullets: saucerBullets.length,
+      particles: particles.length,
+      shockwaves: shockwaves.length,
+      viewportWidth: VIEW_W,
+      viewportHeight: VIEW_H,
+      worldWidth: W,
+      worldHeight: H,
+      displayScale: DISPLAY_SCALE,
+      renderWidth: canvas ? canvas.width : 0,
+      renderHeight: canvas ? canvas.height : 0,
+      dpr: DPR
+    };
+  }
+
   // ============================================================
   // MAIN LOOP
   // ============================================================
@@ -1693,6 +1867,7 @@
 
   function frame(now) {
     if (!ctx) return;
+    const perfFrame = perfMetrics.beginFrame(now);
     let dt = (now - lastTime) / 1000;
     if (dt > 0.05) dt = 0.05; // clamp
     lastTime = now;
@@ -1712,6 +1887,7 @@
       drawFractaloids(totalTime, []);
       drawFractalDiveOverlay();
       updateHUD();
+      perfMetrics.endFrame(perfFrame, perfFrameInfo(dt));
       requestAnimationFrame(frame);
       return;
     }
@@ -1848,6 +2024,7 @@
       drawFractaloids(totalTime, []);
     }
 
+    perfMetrics.endFrame(perfFrame, perfFrameInfo(dt));
     requestAnimationFrame(frame);
   }
 

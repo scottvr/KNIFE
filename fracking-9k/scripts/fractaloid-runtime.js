@@ -10,6 +10,9 @@
     const diveZoomStepOut = options.diveZoomStepOut != null ? options.diveZoomStepOut : 1.14;
     const diveMinZoom = options.diveMinZoom != null ? options.diveMinZoom : 1e-9;
     const diveMaxZoom = options.diveMaxZoom != null ? options.diveMaxZoom : 12.0;
+    const diveEntryZoomBias = options.diveEntryZoomBias != null ? options.diveEntryZoomBias : 1.06;
+    const diveAutoZoomInSecs = options.diveAutoZoomInSecs != null ? options.diveAutoZoomInSecs : 0.9;
+    const diveAutoZoomInRate = options.diveAutoZoomInRate != null ? options.diveAutoZoomInRate : 0.998;
     const strokeWithVectorGlow = typeof options.strokeWithVectorGlow === 'function'
       ? options.strokeWithVectorGlow
       : (context, drawStrokePath) => {
@@ -137,15 +140,20 @@
       const baseDisplayR = Math.max(target.r, target.baseR * 2.2);
       // Push dive target to near full-screen so keyboard zoom has room to reveal structure.
       const screenFillR = Math.max(Math.min(width, height) * 0.58, Math.hypot(width, height) * 0.52);
+      const displayR = Math.max(baseDisplayR, screenFillR);
+      const sourceRadius = Math.max(1e-6, target.r);
+      // Compensate zoom for the radius growth we force in dive so we do not spawn "inside" the fractal.
+      const zoomOutForDisplayGrow = Math.max(1, displayR / sourceRadius);
+      const entryZoom = clampDiveZoom(target.fzoom * zoomOutForDisplayGrow * diveEntryZoomBias);
       dive = {
         target,
         hitPoint: opts.hitPoint || null,
         fx0: target.fx,
         fy0: target.fy,
-        zoom: clampDiveZoom(target.fzoom * 0.92),
+        zoom: entryZoom,
         panX: 0,
         panY: 0,
-        displayR: Math.max(baseDisplayR, screenFillR),
+        displayR,
         age: 0
       };
       target.vx = 0;
@@ -179,14 +187,29 @@
       });
     }
 
-    function nudgeDive(code, shiftKey = false, onExit = null) {
+    function nudgeDive(code, shiftKey = false, onExit = null, opts = {}) {
       if (!hasDive()) return false;
-      const panStep = Math.max(dive.zoom * (shiftKey ? 0.38 : 0.16), 1e-7);
-      if (code === 'ArrowLeft' || code === 'KeyA') dive.panX -= panStep;
-      else if (code === 'ArrowRight' || code === 'KeyD') dive.panX += panStep;
-      else if (code === 'ArrowUp' || code === 'KeyW') dive.panY -= panStep;
-      else if (code === 'ArrowDown' || code === 'KeyS') dive.panY += panStep;
-      else if (code === 'KeyQ' || code === 'Minus' || code === 'NumpadSubtract') dive.zoom = clampDiveZoom(dive.zoom * diveZoomStepOut);
+      const displayScale = Math.max(0.1, Number.isFinite(opts.displayScale) ? opts.displayScale : 1);
+      // Keep perceptual pan speed stable when the same world is upscaled on screen.
+      const panScaleNorm = 1 / displayScale;
+      const panStep = Math.max(dive.zoom * (shiftKey ? 0.38 : 0.16) * panScaleNorm, 1e-7);
+      let panDirX = 0;
+      let panDirY = 0;
+      if (code === 'ArrowLeft' || code === 'KeyA') panDirX = -1;
+      else if (code === 'ArrowRight' || code === 'KeyD') panDirX = 1;
+      else if (code === 'ArrowUp' || code === 'KeyW') panDirY = -1;
+      else if (code === 'ArrowDown' || code === 'KeyS') panDirY = 1;
+
+      if (panDirX !== 0 || panDirY !== 0) {
+        const t = dive.target || {};
+        const spin = (Number.isFinite(t.angle) ? t.angle : 0) + (Number.isFinite(t.frot) ? t.frot : 0);
+        const c = Math.cos(spin);
+        const s = Math.sin(spin);
+        const rotatedX = panDirX * c - panDirY * s;
+        const rotatedY = panDirX * s + panDirY * c;
+        dive.panX += rotatedX * panStep;
+        dive.panY += rotatedY * panStep;
+      } else if (code === 'KeyQ' || code === 'Minus' || code === 'NumpadSubtract') dive.zoom = clampDiveZoom(dive.zoom * diveZoomStepOut);
       else if (code === 'KeyE' || code === 'Equal' || code === 'NumpadAdd') dive.zoom = clampDiveZoom(dive.zoom * diveZoomStepIn);
       else if (code === 'KeyR') {
         dive.panX = 0;
@@ -200,9 +223,14 @@
       return true;
     }
 
-    function wheelDive(deltaY) {
+    function wheelDive(deltaY, opts = {}) {
       if (!hasDive()) return false;
-      dive.zoom = clampDiveZoom(dive.zoom * (deltaY > 0 ? diveZoomStepOut : diveZoomStepIn));
+      const displayScale = Math.max(0.1, Number.isFinite(opts.displayScale) ? opts.displayScale : 1);
+      // Keep wheel zoom progression close between native and upscaled arcade display.
+      const zoomScaleNorm = 1 / displayScale;
+      const zoomInStep = Math.pow(diveZoomStepIn, zoomScaleNorm);
+      const zoomOutStep = Math.pow(diveZoomStepOut, zoomScaleNorm);
+      dive.zoom = clampDiveZoom(dive.zoom * (deltaY > 0 ? zoomOutStep : zoomInStep));
       return true;
     }
 
@@ -214,8 +242,8 @@
       a.x += (width * 0.5 - a.x) * centerEase;
       a.y += (height * 0.5 - a.y) * centerEase;
       a.r += (dive.displayR - a.r) * Math.min(1, dt * 3.5);
-      if (dive.age < 1.2) {
-        dive.zoom = clampDiveZoom(dive.zoom * Math.pow(0.992, dt * 60));
+      if (dive.age < diveAutoZoomInSecs) {
+        dive.zoom = clampDiveZoom(dive.zoom * Math.pow(diveAutoZoomInRate, dt * 60));
       }
       a.fzoom = clampDiveZoom(dive.zoom);
       a.fx = dive.fx0 + dive.panX;
