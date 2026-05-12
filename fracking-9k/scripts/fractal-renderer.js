@@ -138,6 +138,30 @@ function createFractalRenderer(glCtx) {
       return palettePlasma(t, seed, cycle);
     }
 
+    float paletteCoordForMode(float tNorm, float mode) {
+      float t = fract(tNorm);
+      if (mode < 0.5) {
+        // Harmonic palettes expect angular phase for full hue travel.
+        return t * 6.28318;
+      }
+      if (mode < 1.5) {
+        // Ember is piecewise over [0, 1].
+        return t;
+      }
+      if (mode < 2.5) {
+        // Firefly already maps t to angular domain internally.
+        return t;
+      }
+      if (mode < 3.5) {
+        // Gold computes q = pow(sn, 0.35) * 0.15; invert that mapping so a
+        // normalized [0,1] input can traverse the full stop domain.
+        float q = max(t, 0.000001);
+        return pow(q / 0.15, 1.0 / 0.35);
+      }
+      // Plasma uses gentle phase travel; normalized t is expected.
+      return t;
+    }
+
     float chromaOf(vec3 color) {
       float hi = max(max(color.r, color.g), color.b);
       float lo = min(min(color.r, color.g), color.b);
@@ -277,7 +301,12 @@ function createFractalRenderer(glCtx) {
 
       // Linear iteration ramp by growth size ratio:
       // v_sizeNorm = 0 at spawn size, 1 at ~3x spawn size.
-      int maxIter = int(mix(50.0, 150.0, clamp(v_sizeNorm, 0.0, 1.0)) + 0.5);
+      int maxIter = int(mix(75.0, 220.0, clamp(v_sizeNorm, 0.0, 1.0)) + 0.5);
+      if (isJulia && !enhanceColor && !inDive) {
+        // Classic Julia reads better with a lower iter ceiling; very high ceilings
+        // collapse visible pixels into near-identical late-escape buckets.
+        maxIter = int(mix(40.0, 120.0, clamp(v_sizeNorm, 0.0, 1.0)) + 0.5);
+      }
       if (inDive) {
         maxIter = int(clamp(180.0 + fractalZoomDepth * 18.0, 180.0, 360.0));
       } else if (enhanceColor) {
@@ -306,7 +335,7 @@ function createFractalRenderer(glCtx) {
       float orbitTrapCross = 1e9;
       float orbitTrapCircle = 1e9;
 
-      for (int i = 0; i < 360; i++) {
+      for (int i = 0; i < 640; i++) {
         if (i >= maxIter) break;
         if (abs(mode - MODE_TAU) < 0.5) {
           z = cPowReal(z, TAU_POWER) + cplx;
@@ -361,14 +390,31 @@ function createFractalRenderer(glCtx) {
       float bandDetailFreq = enhanceColor
         ? mix(0.015, 0.044, v_sizeNorm)
         : mix(0.028, 0.082, v_sizeNorm);
-      float bandCoordDetail = smoothIter * bandDetailFreq;
+      if (isJulia && !enhanceColor && !inDive) {
+        // Increase color index spread for classic Julia to avoid monotone filaments.
+        bandDetailFreq = mix(0.072, 0.186, clamp(v_sizeNorm, 0.0, 1.0));
+      }
+      float detailIterComp = 1.0;
+      if (!enhanceColor && !inDive && !isJulia) {
+        // Keep classic non-Julia palettes lively even with reduced maxIter.
+        // This recreates prior contour richness without forcing 500-iter ramps.
+        detailIterComp = clamp(500.0 / max(float(maxIter), 1.0), 1.0, 2.6);
+      }
+      float bandCoordDetail = smoothIter * bandDetailFreq * detailIterComp;
       float tWide = fract(bandWideQuant + bandPhase);
       float tDetail = fract(bandCoordDetail + bandPhase * 0.52);
+      float tClassic = tDetail;
+      if (!enhanceColor && !inDive && !isJulia) {
+        // Blend coarse + detail phase in classic non-Julia mode to avoid
+        // flat plateaus while keeping boundaries readable.
+        float classicBlend = 0.28 + 0.18 * clamp(v_sizeNorm, 0.0, 1.0);
+        tClassic = mix(tWide, tDetail, classicBlend);
+      }
       float t = inDive
         ? fract(bandCoordDetail * 0.7 + bandPhase * 0.85)
         : (enhanceColor
           ? mix(tWide, tDetail, 0.34 + 0.28 * clamp(v_sizeNorm, 0.0, 1.0))
-          : tDetail);
+          : (isJulia ? tDetail : tClassic));
       float paletteCycle = u_time
         * paletteCycleRate(v_paletteMode, v_palette, enhanceColor)
         * paletteCycleModeBoost(v_paletteMode)
@@ -384,23 +430,37 @@ function createFractalRenderer(glCtx) {
           // Enhanced look: magnet benefits from an even softer interior gate.
           insideMask = smoothstep(0.70, 0.994, iterRatio);
         }
+      } else if (isJulia) {
+        // Classic Julia: avoid hard binary interior fill so escape-time bands remain visible.
+        insideMask = smoothstep(0.90, 1.0, iterRatio);
       }
       float trapCrossTone = exp(-orbitTrapCross * 0.50);
       float trapCircleTone = exp(-orbitTrapCircle * 9.0);
       float trapTone = clamp(trapCrossTone * 0.65 + trapCircleTone * 0.35, 0.0, 1.0);
       vec3 insideBase = enhanceColor
         ? (isMagnet ? vec3(0.015, 0.02, 0.03) : vec3(0.09, 0.11, 0.15))
-        : vec3(0.0, 0.0, 0.0);
+        : (isJulia ? vec3(0.012, 0.012, 0.018) : vec3(0.0, 0.0, 0.0));
+      float insideAccentMode = (!enhanceColor && isJulia)
+        ? v_paletteMode
+        : mod(v_paletteMode + 0.5, 5.0);
+      float insideAccentT = fract(t * 0.42 + trapTone * 0.85 + v_palette * 0.19);
       vec3 insideAccent = paletteByMode(
-        fract(t * 0.42 + trapTone * 0.85 + v_palette * 0.19),
+        paletteCoordForMode(insideAccentT, insideAccentMode),
         fract(v_palette + 0.13),
         paletteCycle * 0.5 + 0.7,
-        mod(v_paletteMode + 0.5, 5.0)
+        insideAccentMode
       );
-      float insideAccentMix = enhanceColor ? ((0.15 + trapTone * 0.15) * neonTweak) : 0.0;
+      float insideAccentMix = enhanceColor
+        ? ((0.15 + trapTone * 0.15) * neonTweak)
+        : (isJulia ? (0.24 + trapTone * 0.28) : 0.0);
       vec3 inside = mix(insideBase, insideAccent, insideAccentMix);
-      float paletteT = enhanceColor ? pow(t, 0.9) : t;
-      vec3 outside = paletteByMode(paletteT, v_palette, paletteCycle, v_paletteMode);
+      float paletteDomainT = enhanceColor ? pow(fract(t), 0.9) : fract(t);
+      vec3 outside = paletteByMode(
+        paletteCoordForMode(paletteDomainT, v_paletteMode),
+        v_palette,
+        paletteCycle,
+        v_paletteMode
+      );
       float outsideLuma = lumaOf(outside);
       if (enhanceColor && liftMixOn && outsideLuma < 0.08 && chromaTweak > 0.0001) {
         vec3 lift = palettePlasma(fract(t * 0.55 + 0.19), fract(v_palette + 0.21), paletteCycle + 0.7);
@@ -422,7 +482,13 @@ function createFractalRenderer(glCtx) {
       float colorChroma = chromaOf(color);
       if (enhanceColor && colorChroma < 0.012 && chromaTweak > 0.0001) {
         float accentMode = mod(v_paletteMode + 1.0, 5.0);
-        vec3 accent = paletteByMode(fract(v_palette * 1.73 + iterRatio * 0.33), fract(v_palette + 0.37), paletteCycle + 0.83, accentMode);
+        float accentT = fract(v_palette * 1.73 + iterRatio * 0.33);
+        vec3 accent = paletteByMode(
+          paletteCoordForMode(accentT, accentMode),
+          fract(v_palette + 0.37),
+          paletteCycle + 0.83,
+          accentMode
+        );
         float fixAmount = smoothstep(0.12, 0.0, colorChroma);
         color = mix(color, accent + vec3(0.05, 0.03, 0.02), (0.16 + fixAmount * 0.52) * chromaTweak);
       }
@@ -431,10 +497,19 @@ function createFractalRenderer(glCtx) {
       float alpha = smoothstep(alphaEdge + 0.06, alphaEdge - 0.05, r);
       if (isJulia) {
         float boundaryBand = smoothstep(0.36, 0.78, iterRatio) * (1.0 - smoothstep(0.88, 0.997, iterRatio));
+        if (!enhanceColor) {
+          // Classic Julia should expose more escape-time range instead of only a
+          // narrow late-escape contour.
+          boundaryBand = smoothstep(0.20, 0.84, iterRatio) * (1.0 - smoothstep(0.95, 0.999, iterRatio));
+        }
         float interior = step(float(maxIter), float(iBreak));
         float radialFade = smoothstep(1.22, 0.88, r);
         float filament = 0.65 + 0.35 * sin((samplePoint.x - samplePoint.y) * 18.0 + v_palette * 6.28318 + u_time * 0.32);
         float interiorGate = mix(0.08, 0.28, clamp(filament, 0.0, 1.0));
+        if (!enhanceColor) {
+          // Bias toward boundary colorization in classic mode.
+          interiorGate *= 0.42;
+        }
         alpha = max(boundaryBand * 1.35, interior * interiorGate) * radialFade;
         float structure = max(boundaryBand, interior * interiorGate);
         if (structure < 0.012) {
@@ -587,7 +662,7 @@ function createFractalRenderer(glCtx) {
       const startRadius = Math.max(0.0001, a.baseR * (a.growthStart || 1));
       const sizeRatio = a.r / startRadius;
       // Iteration ramp: 1x start size => 50 iters, 3x start size => 150 iters.
-      const detailNorm = Math.max(0, Math.min(1, (sizeRatio - 1) * 0.5));
+      const detailNorm = Math.max(0, Math.min(1, (sizeRatio - 1) * 0.25));
       data[o + 8] = detailNorm;
       data[o + 9] = a.mode || 0;
       data[o + 10] = a.jx || 0;

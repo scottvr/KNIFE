@@ -28,7 +28,7 @@
         focusY: 0.003,
         zoomBase: 1.02,
         zoomVariance: 0.52,
-        zoomMin: 1.0,
+        zoomMin: 1.5,
         zoomMax: 2.5,
         spreadMul: 0.94,
         waveZoomMul: 0.8,
@@ -84,12 +84,12 @@
       buffalo: {
         mode: classModes.buffalo,
         label: 'BUFFALO',
-        focusX: -1.813978835021709,
+        focusX: -1.713978835021709,
         focusY: -0.18926374819102731,
-        zoomBase: 1 / 10.7,
+        zoomBase: 1/7,
         zoomVariance: 0.034,
-        zoomMin: 0.026,
-        zoomMax: 0.24,
+        zoomMin: 0.26,
+        zoomMax: 0.54,
         spreadMul: 0.42,
         waveZoomMul: 0.36,
         childZoomMin: 0.68,
@@ -122,7 +122,8 @@
       : ['tau', 'magnet', 'buffalo', 'tricorn', 'julia', 'mandelbrot'];
     const classSequence = Array.isArray(options.classSequence) && options.classSequence.length
       ? options.classSequence.slice()
-      : ['mandelbrot', 'magnet', 'julia', 'buffalo', 'tricorn', 'julia', 'mandelbrot', 'tau'];
+      : ['mandelbrot', 'magnet', 'julia', 'buffalo', 'tricorn', 'julia', 'tau'];
+      // : ['julia', 'buffalo', 'mandelbrot', 'magnet', 'julia', 'buffalo', 'tricorn', 'julia', 'tau'];
     const classSpecs = options.classSpecs || defaultClassSpecs(classModes);
     const selectedClass = typeof options.selectedClass === 'string' ? options.selectedClass : 'cycle';
     const mixAfterCycle = options.mixAfterCycle !== false;

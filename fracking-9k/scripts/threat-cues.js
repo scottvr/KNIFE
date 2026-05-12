@@ -11,13 +11,6 @@
       return d;
     }
 
-    function wrapCoord(v, span) {
-      if (!span || span <= 0) return v;
-      if (v < 0) return v + span;
-      if (v > span) return v - span;
-      return v;
-    }
-
     function threatFromFractaloid(ship, target, width, height) {
       const dx = wrappedDelta(target.x - ship.x, width);
       const dy = wrappedDelta(target.y - ship.y, height);
@@ -31,8 +24,11 @@
       if (score <= 0.06) return null;
       return {
         kind: 'fractaloid',
-        x: wrapCoord(ship.x + dx, width),
-        y: wrapCoord(ship.y + dy, height),
+        // Keep cue anchored to the same world coords as the rendered entity.
+        // Using the "nearest wrapped image to ship" can place the cue on the
+        // opposite edge before the fractaloid itself appears.
+        x: target.x,
+        y: target.y,
         radius: Math.max(10, (target.r || 12) + 5),
         score,
         phase: (target.fseed || 0) * Math.PI * 2
@@ -52,8 +48,8 @@
       if (score <= 0.08) return null;
       return {
         kind: 'bullet',
-        x: wrapCoord(ship.x + dx, width),
-        y: wrapCoord(ship.y + dy, height),
+        x: bullet.x,
+        y: bullet.y,
         radius: 12,
         score,
         phase: (bullet.life || 0.5) * Math.PI * 4

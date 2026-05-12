@@ -290,9 +290,9 @@
   const SHIP_MAX_SPEED = 666;
   const BULLET_SPEED = 666;
   const BULLET_LIFE = 0.85;
-  const MAX_BULLETS = 16; // power-of-two ammo ceiling
+  const MAX_BULLETS = 8; // power-of-two ammo ceiling
   const FIRE_COOLDOWN_BASE = 0.02;
-  const FIRE_PATTERN = [ 4, 4, 2, 2, 8, 8 ];
+  const FIRE_PATTERN = [ 8, 4, 2, 2, 1 ];
   const SHIP_FRACTAL_CLASS = 'mandelbrot_outline'; // 'sierpinski' | 'mandelbrot_outline'
   const SHIP_FRACTAL_CLASSES = ['sierpinski', 'mandelbrot_outline'];
   const FRACTALOID_CLASS = 'cycle'; // 'cycle' | 'tau' | 'magnet' | 'buffalo' | 'tricorn' | 'julia' | 'mandelbrot'
@@ -340,7 +340,7 @@
   const FRACTALOID_COLORIZER_ENHANCED = FRACTALOID_COLORIZER_MODE === 'enhanced';
   const FRACTALOID_ENHANCED_LIFTMIX = false; // set true to re-enable luma-lift rescue in enhanced mode
   const FRACTALOID_CHROMA_TWEAK = FRACTALOID_COLORIZER_MODE === 'enhanced' ? 1.0 : 0.0; // rescue boosts are enhanced-only
-  const FRACTALOID_NEON_TWEAK = FRACTALOID_COLORIZER_MODE === 'enhanced' ? 0.1 : 0.0; // boosted glow path is enhanced-only
+  const FRACTALOID_NEON_TWEAK = FRACTALOID_COLORIZER_MODE === 'enhanced' ? 1.0 : 0.5; // boosted glow path is enhanced-only (temporaraily enabled in classic mode deliberately for testing.)
   const SAUCER_FRACTAL_CLASS = 'cycle'; // 'cycle' | 'classic' | 'sierpinski' | 'koch'
   const SAUCER_FRACTAL_CLASSES = ['classic', 'sierpinski', 'koch'];
   const shipIconAsset = window.FrackingShipIcon || null;
@@ -349,7 +349,7 @@
     : { x: 1.1, y: 0.45, w: 5.6, h: 5.6 };
   const SHIP_ICON_STROKE_WIDTH = shipIconAsset && typeof shipIconAsset.strokeWidth === 'number'
     ? shipIconAsset.strokeWidth
-    : 0.23;
+    : 0.19;
   let shipIconPath = null;
   if (typeof Path2D === 'function' && shipIconAsset && typeof shipIconAsset.pathD === 'string') {
     try {
@@ -463,7 +463,7 @@
     { name: 'Needle', focusX: -1.25066, focusY: 0.02012, seedBias: 0.56, spread: 0.62, zoomBase: 1.86 },
     { name: 'Elephant', focusX: 0.285, focusY: 0.012, seedBias: 0.78, spread: 0.72, zoomBase: 1.78 }
   ];
-  const SAUCER_LARGE = { r: 18, score: 200, speed: 90, fireRate: 1.6, accuracy: 0.0 };
+  const SAUCER_LARGE = { r: 17, score: 200, speed: 90, fireRate: 1.6, accuracy: 0.0 };
   const SAUCER_SMALL = { r: 15, score: 1000, speed: 130, fireRate: 1.0, accuracy: 0.75 };
   gameplaySystems = (window.FrackingGameplaySystems && typeof window.FrackingGameplaySystems.create === 'function')
     ? window.FrackingGameplaySystems.create({
@@ -683,6 +683,28 @@
     return { x, y };
   }
 
+  function antiAxisSpawnVelocity(vx, vy, speed, fromSplit = false) {
+    const targetSpeed = Math.max(0.001, speed);
+    const minRatio = fromSplit ? 0.028 : 0.018;
+    const maxRatio = fromSplit ? 0.072 : 0.048;
+    const minComp = targetSpeed * minRatio;
+    const maxComp = targetSpeed * maxRatio;
+    let nx = vx;
+    let ny = vy;
+
+    // Prevent nearly pure horizontal/vertical travel that can loop forever in
+    // the off-screen passthrough corridor when fractaloids grow very large.
+    if (Math.abs(nx) < minComp) nx = randSign() * rand(minComp, maxComp);
+    if (Math.abs(ny) < minComp) ny = randSign() * rand(minComp, maxComp);
+
+    const mag = Math.hypot(nx, ny);
+    if (mag < 0.0001) return { vx, vy };
+    return {
+      vx: (nx / mag) * targetSpeed,
+      vy: (ny / mag) * targetSpeed
+    };
+  }
+
 
   // ============================================================
   // SHIP
@@ -708,6 +730,7 @@
     ctx.lineTo(x2, y2);
     ctx.lineTo(x3, y3);
     ctx.closePath();
+    ctx.lineWidth = 1.2 / (depth + 1);
     ctx.stroke();
     if (depth <= 0) return;
 
@@ -1096,6 +1119,12 @@
     }
     const speed = (FRACTALOID_BASE_SPEED + speedBoost + Math.random() * 30) * profile.speedMul;
     const dir = Math.random() * Math.PI * 2;
+    const initialVelocity = antiAxisSpawnVelocity(
+      Math.cos(dir) * speed,
+      Math.sin(dir) * speed,
+      speed,
+      !!parent
+    );
     const jitter = parent ? parent.r * 0.2 : 0;
     const growthStart = parent ? 0.7 : 0.82;
     const growthMax = FRACTALOID_GROWTH_SCALE[sizeKey] * profile.growthMul * rand(1.02, 1.13);
@@ -1113,8 +1142,8 @@
     return {
       x: x + rand(-jitter, jitter),
       y: y + rand(-jitter, jitter),
-      vx: Math.cos(dir) * speed,
-      vy: Math.sin(dir) * speed,
+      vx: initialVelocity.vx,
+      vy: initialVelocity.vy,
       angle: 0,
       spin: rand(-1.2, 1.2),
       baseR: r,

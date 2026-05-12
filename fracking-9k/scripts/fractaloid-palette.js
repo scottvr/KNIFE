@@ -23,17 +23,20 @@
     }
 
     function pickFractaloidPaletteMode(mode, isBoss = false, parentMode = null) {
-      if (parentMode != null && Math.random() < 0.82) {
-        return parentMode;
+      const isJulia = mode === C.julia;
+      if (parentMode != null) {
+        const inheritChance = isJulia
+          ? (isBoss ? 0.62 : 0.48)
+          : 0.82;
+        if (Math.random() < inheritChance) return parentMode;
       }
 
-      const isJulia = mode === C.julia;
       const weighted = isBoss
         ? (isJulia
-            ? [[P.plasma, 0.36], [P.gold, 0.24], [P.ember, 0.18], [P.cosmic, 0.16], [P.firefly, 0.06]]
+            ? [[P.plasma, 0.30], [P.cosmic, 0.28], [P.gold, 0.20], [P.firefly, 0.12], [P.ember, 0.10]]
             : [[P.plasma, 0.34], [P.cosmic, 0.26], [P.gold, 0.22], [P.ember, 0.10], [P.firefly, 0.08]])
         : (isJulia
-            ? [[P.firefly, 0.30], [P.ember, 0.26], [P.gold, 0.20], [P.cosmic, 0.14], [P.plasma, 0.10]]
+            ? [[P.plasma, 0.24], [P.cosmic, 0.24], [P.gold, 0.20], [P.firefly, 0.18], [P.ember, 0.14]]
             : [[P.cosmic, 0.34], [P.plasma, 0.24], [P.gold, 0.20], [P.ember, 0.14], [P.firefly, 0.08]]);
 
       return weightedPickPaletteMode(weighted);
