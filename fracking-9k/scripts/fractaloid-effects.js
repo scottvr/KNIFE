@@ -7,6 +7,13 @@
 
   function create(options = {}) {
     const ctx = options.ctx || null;
+    const strokeWithVectorGlow = typeof options.strokeWithVectorGlow === 'function'
+      ? options.strokeWithVectorGlow
+      : (context, drawStrokePath) => {
+          if (!context || typeof drawStrokePath !== 'function') return;
+          drawStrokePath();
+          context.stroke();
+        };
 
     function modeTelegraphHue(mode) {
       if (mode === 1) return 206; // julia
@@ -30,13 +37,23 @@
       ctx.globalCompositeOperation = 'lighter';
       ctx.lineWidth = Math.max(1, 1.3 + fade * 1.6);
       ctx.strokeStyle = `hsla(${hue}, 100%, ${62 + pulse * 18}%, ${0.16 + fade * 0.34})`;
-      ctx.beginPath();
-      ctx.arc(a.x, a.y, rOuter, 0, Math.PI * 2);
-      ctx.stroke();
+      strokeWithVectorGlow(ctx, () => {
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, rOuter, 0, Math.PI * 2);
+      }, {
+        haloWidthMul: 2.0,
+        haloAlpha: 0.3,
+        blur: 6.0
+      });
       ctx.strokeStyle = `hsla(${hue}, 92%, ${56 + pulse * 14}%, ${0.08 + fade * 0.22})`;
-      ctx.beginPath();
-      ctx.arc(a.x, a.y, rInner, 0, Math.PI * 2);
-      ctx.stroke();
+      strokeWithVectorGlow(ctx, () => {
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, rInner, 0, Math.PI * 2);
+      }, {
+        haloWidthMul: 1.9,
+        haloAlpha: 0.2,
+        blur: 5.2
+      });
       ctx.restore();
     }
 

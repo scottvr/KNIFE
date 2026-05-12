@@ -1,14 +1,20 @@
   @import url('https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap');
 
+  :root {
+    /* Lifted phosphor black: not true #000, with a faint cool bias. */
+    --crt-black: #0a0d12;
+    --crt-black-deep: #070a0e;
+  }
+
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
 
   html, body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: #000;
+    background: var(--crt-black-deep);
     font-family: 'VT323', monospace;
-    color: #fff;
+    color: #ddd;
     touch-action: none;
     overscroll-behavior: none;
   }
@@ -30,7 +36,7 @@
     touch-action: none;
   }
   #game {
-    background: #000;
+    background: radial-gradient(ellipse at center, #0d1219 0%, var(--crt-black) 46%, var(--crt-black-deep) 100%);
     box-shadow: 0 0 40px rgba(255,255,255,0.06) inset;
     z-index: 1;
   }
@@ -40,31 +46,41 @@
     z-index: 2;
   }
 
-  /* CRT scanlines */
-  #game-wrap::after {
+  /* CRT pass over all in-game layers (canvases, HUD, controls). */
+  body.playing::before,
+  body.playing::after {
     content: '';
     position: fixed;
     inset: 0;
     pointer-events: none;
-    background: repeating-linear-gradient(
-      0deg,
-      rgba(0,0,0,0) 0px,
-      rgba(0,0,0,0) 2px,
-      rgba(0,0,0,0.09) 3px,
-      rgba(0,0,0,0.09) 4px
-    );
-    mix-blend-mode: multiply;
-    z-index: 5;
   }
 
-  /* Vignette */
-  #game-wrap::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    background: radial-gradient(ellipse at center, transparent 58%, rgba(0,0,0,0.36) 100%);
-    z-index: 4;
+  body.playing::before {
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0) 0px,
+      rgba(0, 0, 0, 0) 1px,
+      rgba(0, 0, 0, 0.16) 2px,
+      rgba(0, 0, 0, 0.16) 3px
+    );
+    mix-blend-mode: multiply;
+    z-index: 40;
+  }
+
+  body.playing::after {
+    background:
+      radial-gradient(ellipse at center, transparent 52%, rgba(0, 0, 0, 0.48) 100%),
+      repeating-linear-gradient(
+        90deg,
+        rgba(255, 0, 0, 0.028) 0px,
+        rgba(255, 0, 0, 0.028) 1px,
+        rgba(0, 255, 255, 0.018) 2px,
+        rgba(0, 255, 255, 0.018) 3px,
+        rgba(0, 0, 0, 0.0) 4px,
+        rgba(0, 0, 0, 0.0) 6px
+      );
+    mix-blend-mode: screen;
+    z-index: 39;
   }
 
   /* HUD */
@@ -79,7 +95,7 @@
     align-items: flex-start;
     font-family: 'Press Start 2P', monospace;
     font-size: 14px;
-    color: #fff;
+    color: #ddd;
     z-index: 10;
     pointer-events: none;
     text-shadow: 0 0 8px rgba(255,255,255,0.5);
@@ -99,7 +115,7 @@
     z-index: 20;
     text-align: center;
     padding: 24px;
-    color: #fff;
+    color: #ddd;
     background: radial-gradient(circle at center, rgba(10,10,30,0.85), rgba(0,0,0,0.95));
     backdrop-filter: blur(2px);
   }
@@ -111,7 +127,7 @@
     margin-bottom: 8px;
     letter-spacing: 2px;
     text-shadow:
-      0 0 10px #fff,
+      0 0 10px #ddd,
       0 0 20px #88f,
       0 0 30px #44f;
     animation: flicker 3s infinite;
@@ -135,7 +151,7 @@
   }
   .instructions .key {
     display: inline-block;
-    border: 2px solid #fff;
+    border: 2px solid #ddd;
     padding: 2px 8px;
     margin: 2px 2px;
     font-family: 'Press Start 2P', monospace;
@@ -147,18 +163,18 @@
     font-size: clamp(14px, 2.5vw, 18px);
     padding: 16px 28px;
     background: #000;
-    color: #fff;
-    border: 3px solid #fff;
+    color: #ddd;
+    border: 3px solid #ddd;
     cursor: pointer;
     letter-spacing: 2px;
     transition: all 0.15s;
     pointer-events: auto;
   }
   .btn:hover, .btn:active {
-    background: #fff;
+    background: #ddd;
     color: #000;
     transform: scale(1.05);
-    box-shadow: 0 0 20px #fff;
+    box-shadow: 0 0 20px #ddd;
   }
 
   @keyframes flicker {
@@ -196,7 +212,7 @@
     border-radius: 50%;
     background: rgba(255,255,255,0.08);
     border: 2px solid rgba(255,255,255,0.5);
-    color: #fff;
+    color: #ddd;
     font-family: 'Press Start 2P', monospace;
     font-size: 22px;
     display: flex;
@@ -210,7 +226,7 @@
   }
   .tbtn.active {
     background: rgba(255,255,255,0.4);
-    border-color: #fff;
+    border-color: #ddd;
     transform: scale(0.92);
     box-shadow: 0 0 16px rgba(255,255,255,0.6);
   }

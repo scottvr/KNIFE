@@ -301,7 +301,7 @@ function createFractalRenderer(glCtx) {
 
       // Linear iteration ramp by growth size ratio:
       // v_sizeNorm = 0 at spawn size, 1 at ~3x spawn size.
-      int maxIter = int(mix(75.0, 220.0, clamp(v_sizeNorm, 0.0, 1.0)) + 0.5);
+      int maxIter = int(mix(50.0, 200.0, clamp(v_sizeNorm, 0.0, 1.0)) + 0.5);
       if (isJulia && !enhanceColor && !inDive) {
         // Classic Julia reads better with a lower iter ceiling; very high ceilings
         // collapse visible pixels into near-identical late-escape buckets.

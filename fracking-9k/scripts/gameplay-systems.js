@@ -4,6 +4,13 @@
   function create(options = {}) {
     const ctx = options.ctx;
     const state = options.state || {};
+    const strokeWithVectorGlow = typeof options.strokeWithVectorGlow === 'function'
+      ? options.strokeWithVectorGlow
+      : (context, drawStrokePath) => {
+          if (!context || typeof drawStrokePath !== 'function') return;
+          drawStrokePath();
+          context.stroke();
+        };
 
     const rand = typeof options.rand === 'function' ? options.rand : (a, b) => a + Math.random() * (b - a);
     const randSign = typeof options.randSign === 'function' ? options.randSign : () => (Math.random() < 0.5 ? -1 : 1);
@@ -158,13 +165,18 @@
       const p2 = { x: -radius * 0.866, y: radius * 0.5 };
       const p3 = { x: radius * 0.866, y: radius * 0.5 };
 
-      ctx.beginPath();
-      ctx.moveTo(p1.x, p1.y);
-      drawKochSegment(p1.x, p1.y, p2.x, p2.y, depth);
-      drawKochSegment(p2.x, p2.y, p3.x, p3.y, depth);
-      drawKochSegment(p3.x, p3.y, p1.x, p1.y, depth);
-      ctx.closePath();
-      ctx.stroke();
+      strokeWithVectorGlow(ctx, () => {
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        drawKochSegment(p1.x, p1.y, p2.x, p2.y, depth);
+        drawKochSegment(p2.x, p2.y, p3.x, p3.y, depth);
+        drawKochSegment(p3.x, p3.y, p1.x, p1.y, depth);
+        ctx.closePath();
+      }, {
+        haloWidthMul: 1.9,
+        haloAlpha: 0.2,
+        blur: 4.8
+      });
     }
 
     function drawSaucer() {
@@ -183,32 +195,47 @@
         const s = r * 1.08;
         const depth = saucer.isSmall ? 2 : 3;
         drawSierpinski(0, -s * 0.84, -s * 0.92, s * 0.72, s * 0.92, s * 0.72, depth);
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.48, r * 0.22);
-        ctx.lineTo(r * 0.48, r * 0.22);
-        ctx.stroke();
+        strokeWithVectorGlow(ctx, () => {
+          ctx.beginPath();
+          ctx.moveTo(-r * 0.48, r * 0.22);
+          ctx.lineTo(r * 0.48, r * 0.22);
+        }, {
+          haloWidthMul: 2.1,
+          haloAlpha: 0.24,
+          blur: 5.2
+        });
       } else if (saucerClass === 'koch') {
         const depth = saucer.isSmall ? 1 : 2;
         drawKochSnowflake(r * 0.94, depth);
-        ctx.beginPath();
-        ctx.arc(0, r * 0.08, r * 0.2, 0, Math.PI * 2);
-        ctx.stroke();
+        strokeWithVectorGlow(ctx, () => {
+          ctx.beginPath();
+          ctx.arc(0, r * 0.08, r * 0.2, 0, Math.PI * 2);
+        }, {
+          haloWidthMul: 2.1,
+          haloAlpha: 0.24,
+          blur: 5.2
+        });
       } else {
-        ctx.beginPath();
-        ctx.moveTo(-r, 0);
-        ctx.lineTo(-r * 0.5, -r * 0.4);
-        ctx.lineTo(r * 0.5, -r * 0.4);
-        ctx.lineTo(r, 0);
-        ctx.lineTo(r * 0.5, r * 0.4);
-        ctx.lineTo(-r * 0.5, r * 0.4);
-        ctx.closePath();
-        ctx.moveTo(-r, 0);
-        ctx.lineTo(r, 0);
-        ctx.moveTo(-r * 0.5, -r * 0.4);
-        ctx.lineTo(-r * 0.25, -r * 0.75);
-        ctx.lineTo(r * 0.25, -r * 0.75);
-        ctx.lineTo(r * 0.5, -r * 0.4);
-        ctx.stroke();
+        strokeWithVectorGlow(ctx, () => {
+          ctx.beginPath();
+          ctx.moveTo(-r, 0);
+          ctx.lineTo(-r * 0.5, -r * 0.4);
+          ctx.lineTo(r * 0.5, -r * 0.4);
+          ctx.lineTo(r, 0);
+          ctx.lineTo(r * 0.5, r * 0.4);
+          ctx.lineTo(-r * 0.5, r * 0.4);
+          ctx.closePath();
+          ctx.moveTo(-r, 0);
+          ctx.lineTo(r, 0);
+          ctx.moveTo(-r * 0.5, -r * 0.4);
+          ctx.lineTo(-r * 0.25, -r * 0.75);
+          ctx.lineTo(r * 0.25, -r * 0.75);
+          ctx.lineTo(r * 0.5, -r * 0.4);
+        }, {
+          haloWidthMul: 2.1,
+          haloAlpha: 0.24,
+          blur: 5.2
+        });
       }
       ctx.restore();
     }
@@ -248,19 +275,24 @@
     function drawShockwaveRing(w, radius, alpha, width, harmonicScale) {
       if (!ctx) return;
       const points = 84;
-      ctx.beginPath();
-      for (let i = 0; i <= points; i++) {
-        const t = i / points;
-        const a = t * Math.PI * 2;
-        const jitter = 1 + Math.sin(a * 6 + w.phase) * 0.05 + Math.sin(a * 11 + w.seed * 9) * 0.025;
-        const x = w.x + Math.cos(a) * radius * jitter;
-        const y = w.y + Math.sin(a) * radius * jitter;
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
       ctx.globalAlpha = alpha;
       ctx.lineWidth = width;
       ctx.strokeStyle = `hsl(${38 + w.seed * 84}, 92%, ${62 + harmonicScale * 14}%)`;
-      ctx.stroke();
+      strokeWithVectorGlow(ctx, () => {
+        ctx.beginPath();
+        for (let i = 0; i <= points; i++) {
+          const t = i / points;
+          const a = t * Math.PI * 2;
+          const jitter = 1 + Math.sin(a * 6 + w.phase) * 0.05 + Math.sin(a * 11 + w.seed * 9) * 0.025;
+          const x = w.x + Math.cos(a) * radius * jitter;
+          const y = w.y + Math.sin(a) * radius * jitter;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+      }, {
+        haloWidthMul: 1.8,
+        haloAlpha: 0.3,
+        blur: 5.8
+      });
     }
 
     function updateParticles(dt) {

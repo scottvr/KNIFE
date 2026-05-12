@@ -269,13 +269,19 @@
         getChainLabel: () => ''
       };
   const fractaloidEffects = (window.FrackingFractaloidEffects && typeof window.FrackingFractaloidEffects.create === 'function')
-    ? window.FrackingFractaloidEffects.create({ ctx })
+    ? window.FrackingFractaloidEffects.create({
+        ctx,
+        strokeWithVectorGlow
+      })
     : {
         modeTelegraphHue: () => 190,
         drawSpawnTelegraph: () => {}
       };
   const threatCueSystem = (window.FrackingThreatCues && typeof window.FrackingThreatCues.create === 'function')
-    ? window.FrackingThreatCues.create({ ctx })
+    ? window.FrackingThreatCues.create({
+        ctx,
+        strokeWithVectorGlow
+      })
     : {
         compute: () => [],
         draw: () => {}
@@ -284,7 +290,7 @@
 
   // Tunable constants (classic-ish)
   const SHIP_SIZE = 20;
-  const SHIP_TURN = 4.0 // rad/s
+  const SHIP_TURN = 3.0 // rad/s
   const SHIP_THRUST = 220; // px/s^2
   const SHIP_FRICTION = 0.4; // per second
   const SHIP_MAX_SPEED = 666;
@@ -340,7 +346,7 @@
   const FRACTALOID_COLORIZER_ENHANCED = FRACTALOID_COLORIZER_MODE === 'enhanced';
   const FRACTALOID_ENHANCED_LIFTMIX = false; // set true to re-enable luma-lift rescue in enhanced mode
   const FRACTALOID_CHROMA_TWEAK = FRACTALOID_COLORIZER_MODE === 'enhanced' ? 1.0 : 0.0; // rescue boosts are enhanced-only
-  const FRACTALOID_NEON_TWEAK = FRACTALOID_COLORIZER_MODE === 'enhanced' ? 1.0 : 0.5; // boosted glow path is enhanced-only (temporaraily enabled in classic mode deliberately for testing.)
+  const FRACTALOID_NEON_TWEAK = FRACTALOID_COLORIZER_MODE === 'enhanced' ? 1.0 : 1.0; // boosted glow path is enhanced-only (temporaraily enabled in classic mode deliberately for testing.)
   const SAUCER_FRACTAL_CLASS = 'cycle'; // 'cycle' | 'classic' | 'sierpinski' | 'koch'
   const SAUCER_FRACTAL_CLASSES = ['classic', 'sierpinski', 'koch'];
   const shipIconAsset = window.FrackingShipIcon || null;
@@ -386,7 +392,8 @@
         diveZoomStepIn: FRACTAL_DIVE_ZOOM_STEP_IN,
         diveZoomStepOut: FRACTAL_DIVE_ZOOM_STEP_OUT,
         diveMinZoom: FRACTAL_DIVE_MIN_ZOOM,
-        diveMaxZoom: FRACTAL_DIVE_MAX_ZOOM
+        diveMaxZoom: FRACTAL_DIVE_MAX_ZOOM,
+        strokeWithVectorGlow
       })
     : {
         hasDive: () => false,
@@ -463,11 +470,12 @@
     { name: 'Needle', focusX: -1.25066, focusY: 0.02012, seedBias: 0.56, spread: 0.62, zoomBase: 1.86 },
     { name: 'Elephant', focusX: 0.285, focusY: 0.012, seedBias: 0.78, spread: 0.72, zoomBase: 1.78 }
   ];
-  const SAUCER_LARGE = { r: 17, score: 200, speed: 90, fireRate: 1.6, accuracy: 0.0 };
-  const SAUCER_SMALL = { r: 15, score: 1000, speed: 130, fireRate: 1.0, accuracy: 0.75 };
+  const SAUCER_LARGE = { r: 21, score: 200, speed: 90, fireRate: 1.6, accuracy: 0.0 };
+  const SAUCER_SMALL = { r: 19, score: 1000, speed: 130, fireRate: 1.0, accuracy: 0.75 };
   gameplaySystems = (window.FrackingGameplaySystems && typeof window.FrackingGameplaySystems.create === 'function')
     ? window.FrackingGameplaySystems.create({
         ctx,
+        strokeWithVectorGlow,
         rand,
         randSign,
         dist2,
@@ -539,6 +547,45 @@
   // ============================================================
   function rand(a, b) { return a + Math.random() * (b - a); }
   function randSign() { return Math.random() < 0.5 ? -1 : 1; }
+
+  function strokeWithVectorGlow(context, drawStrokePath, opts = {}) {
+    if (!context || typeof drawStrokePath !== 'function') return;
+    const baseAlpha = context.globalAlpha;
+    const baseWidth = Number.isFinite(opts.baseWidth) ? opts.baseWidth : context.lineWidth;
+    const haloWidthMul = Number.isFinite(opts.haloWidthMul) ? opts.haloWidthMul : 1.85;
+    const haloAlpha = Number.isFinite(opts.haloAlpha) ? opts.haloAlpha : 0.22;
+    const bodyWidthMul = Number.isFinite(opts.bodyWidthMul) ? opts.bodyWidthMul : 1.0;
+    const bodyAlpha = Number.isFinite(opts.bodyAlpha) ? opts.bodyAlpha : 0.58;
+    const coreWidthMul = Number.isFinite(opts.coreWidthMul) ? opts.coreWidthMul : 0.50;
+    const coreAlpha = Number.isFinite(opts.coreAlpha) ? opts.coreAlpha : 1.0;
+    const blur = Number.isFinite(opts.blur) ? opts.blur : 4.8;
+    const glowEnabled = opts.glowEnabled !== false;
+    const hasHalo = glowEnabled && haloAlpha > 0;
+    const path = opts.path || null;
+
+    context.save();
+    if (hasHalo) {
+      context.globalAlpha = baseAlpha * haloAlpha;
+      context.lineWidth = Math.max(0.1, baseWidth * haloWidthMul);
+      context.shadowBlur = blur;
+      context.shadowColor = context.strokeStyle;
+      drawStrokePath();
+      if (path) context.stroke(path); else context.stroke();
+    }
+
+    context.globalAlpha = baseAlpha * bodyAlpha;
+    context.lineWidth = Math.max(0.1, baseWidth * bodyWidthMul);
+    context.shadowBlur = 0;
+    context.shadowColor = 'transparent';
+    drawStrokePath();
+    if (path) context.stroke(path); else context.stroke();
+
+    context.globalAlpha = baseAlpha * coreAlpha;
+    context.lineWidth = Math.max(0.1, baseWidth * coreWidthMul);
+    drawStrokePath();
+    if (path) context.stroke(path); else context.stroke();
+    context.restore();
+  }
 
   function fract(v) { return v - Math.floor(v); }
   function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
@@ -725,13 +772,18 @@
   }
 
   function drawSierpinski(x1, y1, x2, y2, x3, y3, depth) {
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.lineTo(x3, y3);
-    ctx.closePath();
     ctx.lineWidth = 1.2 / (depth + 1);
-    ctx.stroke();
+    strokeWithVectorGlow(ctx, () => {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.lineTo(x3, y3);
+      ctx.closePath();
+    }, {
+      haloWidthMul: 1.9,
+      haloAlpha: 0.19,
+      blur: 4.8
+    });
     if (depth <= 0) return;
 
     const m12x = (x1 + x2) * 0.5, m12y = (y1 + y2) * 0.5;
@@ -756,29 +808,39 @@
     const xOff = -sz * 0.11;
     const n = 88;
 
-    ctx.beginPath();
-    for (let i = 0; i <= n; i++) {
-      const t = (i / n) * Math.PI * 2;
-      const x = 0.5 * Math.cos(t) - 0.25 * Math.cos(2 * t);
-      const y = 0.5 * Math.sin(t) - 0.25 * Math.sin(2 * t);
-      const px = xOff + x * sx * 2.35;
-      const py = y * sy * 1.95;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.stroke();
+    strokeWithVectorGlow(ctx, () => {
+      ctx.beginPath();
+      for (let i = 0; i <= n; i++) {
+        const t = (i / n) * Math.PI * 2;
+        const x = 0.5 * Math.cos(t) - 0.25 * Math.cos(2 * t);
+        const y = 0.5 * Math.sin(t) - 0.25 * Math.sin(2 * t);
+        const px = xOff + x * sx * 2.35;
+        const py = y * sy * 1.95;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+    }, {
+      haloWidthMul: 2.2,
+      haloAlpha: 0.24,
+      blur: 5.9
+    });
 
-    ctx.beginPath();
     const cx = xOff - sx * 1.72;
     const bulbN = 44;
-    for (let i = 0; i <= bulbN; i++) {
-      const t = (i / bulbN) * Math.PI * 2;
-      const px = cx + Math.cos(t) * sx * 0.52;
-      const py = Math.sin(t) * sy * 0.52;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.stroke();
+    strokeWithVectorGlow(ctx, () => {
+      ctx.beginPath();
+      for (let i = 0; i <= bulbN; i++) {
+        const t = (i / bulbN) * Math.PI * 2;
+        const px = cx + Math.cos(t) * sx * 0.52;
+        const py = Math.sin(t) * sy * 0.52;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+    }, {
+      haloWidthMul: 2.2,
+      haloAlpha: 0.24,
+      blur: 5.9
+    });
   }
 
   function drawMandelbrotOutlineShipHull(sz) {
@@ -798,7 +860,13 @@
     ctx.scale(scale, scale);
     ctx.translate(-cx, -cy);
     ctx.lineWidth = SHIP_ICON_STROKE_WIDTH;
-    ctx.stroke(shipIconPath);
+    strokeWithVectorGlow(ctx, () => {}, {
+      baseWidth: SHIP_ICON_STROKE_WIDTH,
+      haloWidthMul: 2.1,
+      haloAlpha: 0.22,
+      blur: 5.8,
+      path: shipIconPath
+    });
     ctx.restore();
   }
 
@@ -835,19 +903,29 @@
 
     if (getShipFractalClass() !== 'mandelbrot_outline') {
       // small center spar so orientation stays obvious while moving fast
-      ctx.beginPath();
-      ctx.moveTo(-sz * 0.18, 0);
-      ctx.lineTo(sz * 0.62, 0);
-      ctx.stroke();
+      strokeWithVectorGlow(ctx, () => {
+        ctx.beginPath();
+        ctx.moveTo(-sz * 0.18, 0);
+        ctx.lineTo(sz * 0.62, 0);
+      }, {
+        haloWidthMul: 1.9,
+        haloAlpha: 0.18,
+        blur: 4.5
+      });
     }
 
     // thrust flame
     if (s.thrusting && Math.random() > 0.3) {
-      ctx.beginPath();
-      ctx.moveTo(-sz * 0.72, sz * 0.26);
-      ctx.lineTo(-sz * 1.15 - Math.random() * 5, 0);
-      ctx.lineTo(-sz * 0.72, -sz * 0.26);
-      ctx.stroke();
+      strokeWithVectorGlow(ctx, () => {
+        ctx.beginPath();
+        ctx.moveTo(-sz * 0.72, sz * 0.26);
+        ctx.lineTo(-sz * 1.15 - Math.random() * 5, 0);
+        ctx.lineTo(-sz * 0.72, -sz * 0.26);
+      }, {
+        haloWidthMul: 2.4,
+        haloAlpha: 0.26,
+        blur: 6.2
+      });
     }
     ctx.restore();
   }

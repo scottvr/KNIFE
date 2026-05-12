@@ -10,6 +10,13 @@
     const diveZoomStepOut = options.diveZoomStepOut != null ? options.diveZoomStepOut : 1.14;
     const diveMinZoom = options.diveMinZoom != null ? options.diveMinZoom : 1e-9;
     const diveMaxZoom = options.diveMaxZoom != null ? options.diveMaxZoom : 12.0;
+    const strokeWithVectorGlow = typeof options.strokeWithVectorGlow === 'function'
+      ? options.strokeWithVectorGlow
+      : (context, drawStrokePath) => {
+          if (!context || typeof drawStrokePath !== 'function') return;
+          drawStrokePath();
+          context.stroke();
+        };
 
     let dive = null;
 
@@ -58,15 +65,20 @@
       ctx.lineJoin = 'round';
       const scale = a.baseR ? a.r / a.baseR : 1;
       ctx.scale(scale, scale);
-      ctx.beginPath();
-      for (let i = 0; i < a.verts.length; i++) {
-        const v = a.verts[i];
-        const px = Math.cos(v.a) * v.d;
-        const py = Math.sin(v.a) * v.d;
-        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      ctx.stroke();
+      strokeWithVectorGlow(ctx, () => {
+        ctx.beginPath();
+        for (let i = 0; i < a.verts.length; i++) {
+          const v = a.verts[i];
+          const px = Math.cos(v.a) * v.d;
+          const py = Math.sin(v.a) * v.d;
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+      }, {
+        haloWidthMul: 2.0,
+        haloAlpha: 0.22,
+        blur: 5.3
+      });
       ctx.restore();
     }
 

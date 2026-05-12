@@ -3,6 +3,13 @@
 
   function create(options = {}) {
     const ctx = options.ctx;
+    const strokeWithVectorGlow = typeof options.strokeWithVectorGlow === 'function'
+      ? options.strokeWithVectorGlow
+      : (context, drawStrokePath) => {
+          if (!context || typeof drawStrokePath !== 'function') return;
+          drawStrokePath();
+          context.stroke();
+        };
 
     function wrappedDelta(d, span) {
       if (!span || span <= 0) return d;
@@ -102,19 +109,29 @@
         ctx.strokeStyle = `hsla(${hue}, 100%, 70%, ${alpha})`;
         ctx.lineWidth = 1.2 + i * 0.35;
         ctx.setLineDash(i === 0 ? [] : [5, 7]);
-        ctx.beginPath();
-        ctx.arc(threat.x, threat.y, radius, 0, Math.PI * 2);
-        ctx.stroke();
+        strokeWithVectorGlow(ctx, () => {
+          ctx.beginPath();
+          ctx.arc(threat.x, threat.y, radius, 0, Math.PI * 2);
+        }, {
+          haloWidthMul: 1.8,
+          haloAlpha: 0.28,
+          blur: 5.2
+        });
 
         const toShipX = ship.x - threat.x;
         const toShipY = ship.y - threat.y;
         const len = Math.max(0.001, Math.hypot(toShipX, toShipY));
         const ux = toShipX / len;
         const uy = toShipY / len;
-        ctx.beginPath();
-        ctx.moveTo(threat.x + ux * (radius + 2), threat.y + uy * (radius + 2));
-        ctx.lineTo(threat.x + ux * (radius + 10 + pulse * 2), threat.y + uy * (radius + 10 + pulse * 2));
-        ctx.stroke();
+        strokeWithVectorGlow(ctx, () => {
+          ctx.beginPath();
+          ctx.moveTo(threat.x + ux * (radius + 2), threat.y + uy * (radius + 2));
+          ctx.lineTo(threat.x + ux * (radius + 10 + pulse * 2), threat.y + uy * (radius + 10 + pulse * 2));
+        }, {
+          haloWidthMul: 1.8,
+          haloAlpha: 0.24,
+          blur: 4.8
+        });
       }
 
       ctx.restore();
