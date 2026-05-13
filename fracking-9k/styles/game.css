@@ -7,6 +7,10 @@
     --crt-black-deep: #05080d;
     --crt-tube-vignette: rgba(5, 8, 13, 0.74);
     --crt-tube-center: rgba(13, 19, 27, 0.22);
+    --crt-x: 0px;
+    --crt-y: 0px;
+    --crt-w: 100vw;
+    --crt-h: 100vh;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
@@ -15,8 +19,7 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background:
-      radial-gradient(ellipse at 50% 46%, var(--crt-black-lift) 0%, var(--crt-black) 52%, var(--crt-black-deep) 100%);
+    background: #020305;
     font-family: 'VT323', monospace;
     color: #fdf;
     touch-action: none;
@@ -32,10 +35,11 @@
     overflow: hidden;
     isolation: isolate;
     background:
-      radial-gradient(ellipse at 50% 46%, var(--crt-black-lift) 0%, var(--crt-black) 52%, var(--crt-black-deep) 100%);
+      radial-gradient(ellipse at 50% -26%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.0) 46%),
+      linear-gradient(180deg, #05080d 0%, #010204 100%);
   }
 
-  /* Shared tube layer so letterbox and active playfield sit on one CRT surface. */
+  /* Cabinet gloss layer over the panel/letterbox area. */
   #game-wrap::before {
     content: '';
     position: absolute;
@@ -43,8 +47,8 @@
     pointer-events: none;
     z-index: 3;
     background:
-      radial-gradient(ellipse at center, var(--crt-tube-center) 0%, rgba(10, 15, 22, 0.16) 52%, var(--crt-tube-vignette) 100%),
-      linear-gradient(180deg, rgba(16, 24, 34, 0.08) 0%, rgba(8, 12, 18, 0.14) 100%);
+      radial-gradient(ellipse at 50% -20%, rgba(210, 235, 255, 0.055) 0%, rgba(210, 235, 255, 0.0) 54%),
+      linear-gradient(180deg, rgba(8, 12, 18, 0.16) 0%, rgba(2, 3, 5, 0.28) 100%);
   }
 
   #game-wrap canvas {
@@ -67,12 +71,15 @@
     z-index: 2;
   }
 
-  /* CRT pass over all screens for a consistent cabinet look. */
+  /* CRT pass scoped to the active playfield rectangle only. */
   body::before,
   body::after {
     content: '';
     position: fixed;
-    inset: 0;
+    left: var(--crt-x);
+    top: var(--crt-y);
+    width: var(--crt-w);
+    height: var(--crt-h);
     pointer-events: none;
   }
 
@@ -107,9 +114,10 @@
   /* HUD */
   #hud {
     position: fixed;
-    top: env(safe-area-inset-top, 12px);
-    left: 0;
-    right: 0;
+    top: calc(var(--crt-y) + env(safe-area-inset-top, 12px));
+    left: var(--crt-x);
+    width: var(--crt-w);
+    right: auto;
     padding: 12px 18px;
     display: flex;
     justify-content: space-between;
@@ -209,8 +217,9 @@
   #touch-controls {
     position: fixed;
     bottom: 0;
-    left: 0;
-    right: 0;
+    left: var(--crt-x);
+    width: var(--crt-w);
+    right: auto;
     padding: 0 20px env(safe-area-inset-bottom, 20px) 20px;
     display: none;
     justify-content: space-between;

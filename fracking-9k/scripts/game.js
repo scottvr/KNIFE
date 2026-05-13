@@ -251,6 +251,15 @@
     layer.style.height = height + 'px';
   }
 
+  function setCrtViewportCss(x, y, width, height) {
+    const rootStyle = document.documentElement ? document.documentElement.style : null;
+    if (!rootStyle) return;
+    rootStyle.setProperty('--crt-x', `${Math.max(0, Math.round(x))}px`);
+    rootStyle.setProperty('--crt-y', `${Math.max(0, Math.round(y))}px`);
+    rootStyle.setProperty('--crt-w', `${Math.max(1, Math.round(width))}px`);
+    rootStyle.setProperty('--crt-h', `${Math.max(1, Math.round(height))}px`);
+  }
+
   function resize() {
     if (!canvas || !ctx || !fractalCanvas) return;
     const wrap = document.getElementById('game-wrap');
@@ -278,6 +287,7 @@
       placeCanvasLayer(fractalCanvas, offsetX, offsetY, displayWidth, displayHeight);
       fractalCanvas.width = ARCADE_WIDTH;
       fractalCanvas.height = ARCADE_HEIGHT;
+      setCrtViewportCss(offsetX, offsetY, displayWidth, displayHeight);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
     } else {
       DPR = Math.min(window.devicePixelRatio || 1, 2);
@@ -290,6 +300,7 @@
       placeCanvasLayer(fractalCanvas, 0, 0, W, H);
       fractalCanvas.width = Math.floor(W * DPR);
       fractalCanvas.height = Math.floor(H * DPR);
+      setCrtViewportCss(0, 0, W, H);
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     }
     if (fractalRenderer) {
@@ -640,7 +651,7 @@
     : { x: 1.1, y: 0.45, w: 5.6, h: 5.6 };
   const SHIP_ICON_STROKE_WIDTH = shipIconAsset && typeof shipIconAsset.strokeWidth === 'number'
     ? shipIconAsset.strokeWidth
-    : 0.19;
+    : 0.13;
   let shipIconPath = null;
   if (typeof Path2D === 'function' && shipIconAsset && typeof shipIconAsset.pathD === 'string') {
     try {
@@ -1144,7 +1155,7 @@
       return;
     }
 
-    const scale = (sz * 2.24) / SHIP_ICON_VIEWBOX.w;
+    const scale = (sz * 2.00) / SHIP_ICON_VIEWBOX.w;
     const cx = SHIP_ICON_VIEWBOX.x + SHIP_ICON_VIEWBOX.w * 0.5;
     const cy = SHIP_ICON_VIEWBOX.y + SHIP_ICON_VIEWBOX.h * 0.5;
 
@@ -1158,9 +1169,9 @@
     ctx.lineStyle = "#fff"
     strokeWithVectorGlow(ctx, () => {}, {
       baseWidth: SHIP_ICON_STROKE_WIDTH,
-      haloWidthMul: 0.3,
-      haloAlpha: 0.8,
-      blur: 0.5,
+      haloWidthMul: 0.01,
+      haloAlpha: 0.5,
+      blur: 0.2,
       path: shipIconPath
     });
     ctx.restore();
