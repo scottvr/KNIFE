@@ -248,7 +248,13 @@
       panel.style.color = '#ffe5ad';
       panel.textContent = warningText;
     }
-    titleScreen.insertBefore(panel, titleScreen.querySelector('.btn'));
+    const titleContent = titleScreen.querySelector('.overlay-content') || titleScreen;
+    const btnAnchor = titleContent.querySelector('.btn');
+    if (btnAnchor) {
+      titleContent.insertBefore(panel, btnAnchor);
+    } else {
+      titleContent.appendChild(panel);
+    }
   }
 
   let W = 0, H = 0, DPR = 1;

@@ -60,28 +60,36 @@
 </div>
 
 <div id="title-screen" class="overlay">
-  <h1 class="title">FRACKING 9000</h1>
-  <div class="subtitle">★ FRACK THESE FRACKING FRACTALOIDS *</div>
-  <div class="instructions" id="desktop-instr">
-    <span class="key">←</span> <span class="key">→</span> rotate &nbsp;
-    <span class="key">↑</span> thrust<br>
-    <span class="key">SPACE</span> blast &nbsp;
-    <span class="key">SHIFT</span> hyperspace
+  <div class="overlay-screen">
+    <div class="overlay-content">
+      <h1 class="title">FRACKING 9000</h1>
+      <div class="subtitle">★ FRACK THESE FRACKING FRACTALOIDS *</div>
+      <div class="instructions" id="desktop-instr">
+        <span class="key">←</span> <span class="key">→</span> rotate &nbsp;
+        <span class="key">↑</span> thrust<br>
+        <span class="key">SPACE</span> blast &nbsp;
+        <span class="key">SHIFT</span> hyperspace
+      </div>
+      <div class="instructions hidden" id="mobile-instr">
+        tap buttons to rotate, thrust,<br>
+        fire, and hyperspace<br>
+        <span style="opacity:0.6;">Do you have what it takes to be the FRAC KING?</span>
+      </div>
+      <button class="btn" id="start-btn">PRESS START</button>
+    </div>
+    <div class="credit">© 19XX KNIFEtroniks</div>
   </div>
-  <div class="instructions hidden" id="mobile-instr">
-    tap buttons to rotate, thrust,<br>
-    fire, and hyperspace<br>
-    <span style="opacity:0.6;">Do you have what it takes to be the FRAC KING?</span>
-  </div>
-  <button class="btn" id="start-btn">PRESS START</button>
-  <div class="credit">© 19XX KNIFEtroniks</div>
 </div>
 
 <div id="gameover-screen" class="overlay hidden">
-  <h1 class="title" style="font-size: clamp(28px, 8vw, 64px);">GAME OVER</h1>
-  <div class="subtitle" id="final-score">SCORE: 0</div>
-  <div class="instructions">your ship is now space gravel</div>
-  <button class="btn" id="restart-btn">TRY AGAIN</button>
+  <div class="overlay-screen">
+    <div class="overlay-content">
+      <h1 class="title" style="font-size: clamp(28px, 8vw, 64px);">GAME OVER</h1>
+      <div class="subtitle" id="final-score">SCORE: 0</div>
+      <div class="instructions">your ship is now space gravel</div>
+      <button class="btn" id="restart-btn">TRY AGAIN</button>
+    </div>
+  </div>
 </div>
 
 <script src="./scripts/ship-icon.js"></script>

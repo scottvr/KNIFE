@@ -1,6 +1,6 @@
 # Ultimate CRT Mini-Sprint 03: Bloom, Persistence, and Quality Tuning
 
-Feature branch: `feature/glcrtjst`  
+Feature branch: `feature/glcrtjs`  
 Status: `planning ready`  
 Entry criteria: Mini-Sprint 02 complete
 

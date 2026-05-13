@@ -1,6 +1,6 @@
 # Ultimate CRT Mini-Sprint 02: CRT Pass Parity
 
-Feature branch: `feature/glcrtjst`  
+Feature branch: `feature/glcrtjs`  
 Status: `planning ready`  
 Entry criteria: Mini-Sprint 01 complete
 

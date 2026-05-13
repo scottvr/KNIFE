@@ -1,6 +1,6 @@
 # Ultimate CRT Mini-Sprint 04: HUD and Interstitial Unification
 
-Feature branch: `feature/glcrtjst`  
+Feature branch: `feature/glcrtjs`  
 Status: `planning ready`  
 Entry criteria: Mini-Sprint 03 complete
 
