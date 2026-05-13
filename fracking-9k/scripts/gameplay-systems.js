@@ -190,7 +190,7 @@
       if (!saucer) return;
       ctx.save();
       ctx.translate(saucer.x, saucer.y);
-      ctx.strokeStyle = '#fdf';
+      ctx.strokeStyle = '#fff';
       ctx.lineWidth = 1.2;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
@@ -327,7 +327,7 @@
 
     function drawParticles() {
       if (!ctx) return;
-      ctx.fillStyle = '#fdf';
+      ctx.fillStyle = '#fff';
       for (const p of getParticles()) {
         ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
         ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
@@ -386,7 +386,7 @@
 
     function drawBullets() {
       if (!ctx) return;
-      ctx.fillStyle = '#fdf';
+      ctx.fillStyle = '#fff';
       for (const b of getBullets()) ctx.fillRect(b.x - 1.5, b.y - 1.5, 3, 3);
       for (const b of getSaucerBullets()) {
         const t = 1 - b.life;

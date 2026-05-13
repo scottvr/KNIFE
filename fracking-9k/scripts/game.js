@@ -106,6 +106,20 @@
   if (arcadeResQueryRaw && !ARCADE_RES_PRESETS[arcadeResQueryRaw]) {
     console.warn(`[Render mode] Unknown arcade resolution "${arcadeResQueryRaw}". Falling back to "${ARCADE_RES_DEFAULT}".`);
   }
+  const crtScanlinesQueryRaw = (urlParams.get('scanlines') || urlParams.get('crt_scanlines') || urlParams.get('crtScanlines') || '').trim();
+  const crtScanlinesQueryParsed = Number(crtScanlinesQueryRaw);
+  const CRT_SCANLINES_OVERRIDE = (() => {
+    if (!crtScanlinesQueryRaw) return 0;
+    if (!Number.isFinite(crtScanlinesQueryParsed) || crtScanlinesQueryParsed <= 0) {
+      console.warn(`[Render mode] Invalid scanlines "${crtScanlinesQueryRaw}". Using active render height.`);
+      return 0;
+    }
+    const clamped = Math.max(1, Math.min(8192, Math.round(crtScanlinesQueryParsed)));
+    if (clamped !== Math.round(crtScanlinesQueryParsed)) {
+      console.warn(`[Render mode] scanlines "${crtScanlinesQueryParsed}" clamped to "${clamped}".`);
+    }
+    return clamped;
+  })();
   const ARCADE_WIDTH = ARCADE_RES_PRESETS[arcadeResKey].w;
   const ARCADE_HEIGHT = ARCADE_RES_PRESETS[arcadeResKey].h;
   const ARCADE_GLOW_QUALITY = 'medium'; // 'low' | 'medium' | 'high'
@@ -260,6 +274,12 @@
     rootStyle.setProperty('--crt-h', `${Math.max(1, Math.round(height))}px`);
   }
 
+  function setCrtScanlinesCss(count) {
+    const rootStyle = document.documentElement ? document.documentElement.style : null;
+    if (!rootStyle) return;
+    rootStyle.setProperty('--crt-scanlines', `${Math.max(1, Math.round(count))}`);
+  }
+
   function resize() {
     if (!canvas || !ctx || !fractalCanvas) return;
     const wrap = document.getElementById('game-wrap');
@@ -288,6 +308,7 @@
       fractalCanvas.width = ARCADE_WIDTH;
       fractalCanvas.height = ARCADE_HEIGHT;
       setCrtViewportCss(offsetX, offsetY, displayWidth, displayHeight);
+      setCrtScanlinesCss(CRT_SCANLINES_OVERRIDE || ARCADE_HEIGHT);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
     } else {
       DPR = Math.min(window.devicePixelRatio || 1, 2);
@@ -301,6 +322,7 @@
       fractalCanvas.width = Math.floor(W * DPR);
       fractalCanvas.height = Math.floor(H * DPR);
       setCrtViewportCss(0, 0, W, H);
+      setCrtScanlinesCss(CRT_SCANLINES_OVERRIDE || H);
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     }
     if (fractalRenderer) {
@@ -1200,7 +1222,7 @@
     ctx.save();
     ctx.translate(s.x, s.y);
     ctx.rotate(s.angle);
-    ctx.strokeStyle = '#fdf';
+    ctx.strokeStyle = '#fff';
     ctx.lineWidth = 1.3;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
@@ -2153,7 +2175,7 @@
         stateTimer -= dt;
         // big wave text
         ctx.save();
-        ctx.fillStyle = '#fdf';
+        ctx.fillStyle = '#fff';
         ctx.font = 'bold 32px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';

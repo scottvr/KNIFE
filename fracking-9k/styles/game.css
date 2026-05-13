@@ -11,6 +11,7 @@
     --crt-y: 0px;
     --crt-w: 100vw;
     --crt-h: 100vh;
+    --crt-scanlines: 480;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
@@ -21,7 +22,7 @@
     overflow: hidden;
     background: #020305;
     font-family: 'VT323', monospace;
-    color: #fdf;
+    color: #fff;
     touch-action: none;
     overscroll-behavior: none;
   }
@@ -57,13 +58,29 @@
     inset: 0;
     image-rendering: pixelated;
     touch-action: none;
+    /* test horizontal blur */
+    filter: blur(0.8px) contrast(1.05) brightness(1.02);
   }
   #game {
     background: radial-gradient(ellipse at center, var(--crt-black-lift) 0%, var(--crt-black) 46%, var(--crt-black-deep) 100%);
-    box-shadow:
-      0 0 40px rgba(255,255,255,0.06) inset,
-      0 0 0 1px rgba(146, 176, 206, 0.11);
+    border-radius: 3% /4%;
+    overflow: hidden;
+    position: relative;
     z-index: 1;
+  }
+
+  #game::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none; /* Let clicks pass through to the canvas */
+    z-index: 10; /* Make sure this is HIGHER than your canvas z-index */
+  
+    box-shadow:
+      inset 0 0 50px 12pz #000, /* blackout */
+      inset 0 8px 10px -4px rgba(255, 255, 255, 0.15), /* top edge highlight/reflection */
+      inset 0 -12px 15px -4px rgba(0, 0, 0, 0.8), /* bottom edge shadow */
+      inset 0 0 0 2px rgba(10, 14, 20, 1); /* bezel rim */
   }
   #fractal-layer {
     background: transparent;
@@ -83,29 +100,46 @@
     pointer-events: none;
   }
 
+  @keyframes refresh-pulse {
+  0% { opacity: 0.75; }
+  50% { opacity: 1; }
+  100% { opacity: 0.75; }
+}
+  
   body::before {
     background: repeating-linear-gradient(
+/*
+      0deg,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0) 25%,
+      rgba(0, 0, 0, 0.16) 50%,
+      rgba(0, 0, 0, 0.16) 75%
+      */
       0deg,
       rgba(0, 0, 0, 0) 0px,
       rgba(0, 0, 0, 0) 1px,
       rgba(0, 0, 0, 0.16) 2px,
-      rgba(0, 0, 0, 0.16) 3px
+      rgba(0, 0, 0, 0.16) 3px 
     );
+/*  background-repeat: repeat;
+    background-size: 100% calc(var(--crt-h) / var(--crt-scanlines));
+  */
+    animation: refresh-pulse 0.03s infinite; /* 60Hz cycle */
     mix-blend-mode: multiply;
     z-index: 40;
   }
-
+  
   body::after {
     background:
-      radial-gradient(ellipse at center, transparent 52%, rgba(0, 0, 0, 0.48) 100%),
+      radial-gradient(ellipse at center, transparent 22%, rgba(0, 0, 0, 0.78) 100%),
       repeating-linear-gradient(
         90deg,
         rgba(255, 0, 0, 0.028) 0px,
         rgba(255, 0, 0, 0.028) 1px,
         rgba(0, 255, 255, 0.018) 2px,
         rgba(0, 255, 255, 0.018) 3px,
-        rgba(0, 0, 0, 0.0) 4px,
-        rgba(0, 0, 0, 0.0) 6px
+        rgba(0, 0, 255, 0.028) 4px,
+        rgba(0, 0, 255, 0.028) 6px
       );
     mix-blend-mode: screen;
     z-index: 39;
@@ -124,11 +158,19 @@
     align-items: flex-start;
     font-family: 'Press Start 2P', monospace;
     font-size: 14px;
-    color: #fdf;
+    color: #ddd;
     z-index: 10;
     pointer-events: none;
-    text-shadow: 0 0 8px rgba(255,255,255,0.5);
+    text-shadow: 0 0 9px rgba(255,255,255,0.5);
+    color: #f0f0f0;
+  
+  /* chromatic aberration */
+  text-shadow: 
+    -1px 0px 0px rgba(255, 0, 0, 0.4),
+    1px 0px 0px rgba(0, 50, 255, 0.4),
+    0 0 8px rgba(255, 255, 255, 0.4);
   }
+
   #hud .col { display: flex; flex-direction: column; gap: 6px; }
   #hud .col.right { align-items: flex-end; }
   #lives { font-size: 18px; letter-spacing: 4px; }
@@ -144,7 +186,7 @@
     z-index: 20;
     text-align: center;
     padding: 24px;
-    color: #fdf;
+    color: #fff;
     background: radial-gradient(circle at center, rgba(10,10,30,0.85), rgba(0,0,0,0.95));
     backdrop-filter: blur(2px);
   }
@@ -156,7 +198,7 @@
     margin-bottom: 8px;
     letter-spacing: 2px;
     text-shadow:
-      0 0 10px #fdf,
+      0 0 10px #fff,
       0 0 20px #88f,
       0 0 30px #44f;
     animation: flicker 3s infinite;
@@ -180,7 +222,7 @@
   }
   .instructions .key {
     display: inline-block;
-    border: 2px solid #fdf;
+    border: 2px solid #fff;
     padding: 2px 8px;
     margin: 2px 2px;
     font-family: 'Press Start 2P', monospace;
@@ -192,18 +234,18 @@
     font-size: clamp(14px, 2.5vw, 18px);
     padding: 16px 28px;
     background: #090e14;
-    color: #fdf;
-    border: 3px solid #fdf;
+    color: #fff;
+    border: 3px solid #fff;
     cursor: pointer;
     letter-spacing: 2px;
     transition: all 0.15s;
     pointer-events: auto;
   }
   .btn:hover, .btn:active {
-    background: #fdf;
+    background: #fff;
     color: #090e14;
     transform: scale(1.05);
-    box-shadow: 0 0 20px #fdf;
+    box-shadow: 0 0 20px #fff;
   }
 
   @keyframes flicker {
@@ -291,7 +333,7 @@
     border-radius: 50%;
     background: radial-gradient(circle at 34% 28%, rgba(235,245,255,0.2) 0%, rgba(40, 48, 60, 0.7) 38%, rgba(12, 16, 22, 0.92) 100%);
     border: 2px solid rgba(220, 232, 248, 0.52);
-    color: #fdf;
+    color: #fff;
     font-family: 'Press Start 2P', monospace;
     font-size: 22px;
     display: flex;
@@ -335,7 +377,7 @@
   }
   .tbtn.active {
     background: radial-gradient(circle at 34% 28%, rgba(245, 252, 255, 0.34) 0%, rgba(65, 75, 88, 0.76) 42%, rgba(16, 21, 28, 0.94) 100%);
-    border-color: #fdf;
+    border-color: #fff;
     transform: scale(0.92);
     box-shadow:
       inset 0 0 12px rgba(155, 190, 220, 0.33),
@@ -382,7 +424,7 @@
     height: 64px;
     font-size: 24px;
     border-color: rgba(152, 215, 255, 0.72);
-    color: #9fdfff;
+    color: #9fffff;
   }
   .tbtn.dive.exit {
     width: 84px;
