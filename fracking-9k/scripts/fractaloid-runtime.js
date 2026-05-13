@@ -63,7 +63,7 @@
       ctx.save();
       ctx.translate(a.x, a.y);
       ctx.rotate(a.angle);
-      ctx.strokeStyle = '#fff';
+      ctx.strokeStyle = '#fdf';
       ctx.lineWidth = 1.5;
       ctx.lineJoin = 'round';
       const scale = a.baseR ? a.r / a.baseR : 1;

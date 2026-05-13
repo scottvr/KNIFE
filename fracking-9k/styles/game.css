@@ -18,7 +18,7 @@
     background:
       radial-gradient(ellipse at 50% 46%, var(--crt-black-lift) 0%, var(--crt-black) 52%, var(--crt-black-deep) 100%);
     font-family: 'VT323', monospace;
-    color: #ddd;
+    color: #fdf;
     touch-action: none;
     overscroll-behavior: none;
   }
@@ -67,16 +67,16 @@
     z-index: 2;
   }
 
-  /* CRT pass over all in-game layers (canvases, HUD, controls). */
-  body.playing::before,
-  body.playing::after {
+  /* CRT pass over all screens for a consistent cabinet look. */
+  body::before,
+  body::after {
     content: '';
     position: fixed;
     inset: 0;
     pointer-events: none;
   }
 
-  body.playing::before {
+  body::before {
     background: repeating-linear-gradient(
       0deg,
       rgba(0, 0, 0, 0) 0px,
@@ -88,7 +88,7 @@
     z-index: 40;
   }
 
-  body.playing::after {
+  body::after {
     background:
       radial-gradient(ellipse at center, transparent 52%, rgba(0, 0, 0, 0.48) 100%),
       repeating-linear-gradient(
@@ -116,7 +116,7 @@
     align-items: flex-start;
     font-family: 'Press Start 2P', monospace;
     font-size: 14px;
-    color: #ddd;
+    color: #fdf;
     z-index: 10;
     pointer-events: none;
     text-shadow: 0 0 8px rgba(255,255,255,0.5);
@@ -136,7 +136,7 @@
     z-index: 20;
     text-align: center;
     padding: 24px;
-    color: #ddd;
+    color: #fdf;
     background: radial-gradient(circle at center, rgba(10,10,30,0.85), rgba(0,0,0,0.95));
     backdrop-filter: blur(2px);
   }
@@ -148,7 +148,7 @@
     margin-bottom: 8px;
     letter-spacing: 2px;
     text-shadow:
-      0 0 10px #ddd,
+      0 0 10px #fdf,
       0 0 20px #88f,
       0 0 30px #44f;
     animation: flicker 3s infinite;
@@ -172,7 +172,7 @@
   }
   .instructions .key {
     display: inline-block;
-    border: 2px solid #ddd;
+    border: 2px solid #fdf;
     padding: 2px 8px;
     margin: 2px 2px;
     font-family: 'Press Start 2P', monospace;
@@ -184,18 +184,18 @@
     font-size: clamp(14px, 2.5vw, 18px);
     padding: 16px 28px;
     background: #090e14;
-    color: #ddd;
-    border: 3px solid #ddd;
+    color: #fdf;
+    border: 3px solid #fdf;
     cursor: pointer;
     letter-spacing: 2px;
     transition: all 0.15s;
     pointer-events: auto;
   }
   .btn:hover, .btn:active {
-    background: #ddd;
+    background: #fdf;
     color: #090e14;
     transform: scale(1.05);
-    box-shadow: 0 0 20px #ddd;
+    box-shadow: 0 0 20px #fdf;
   }
 
   @keyframes flicker {
@@ -245,6 +245,35 @@
   .touch-right { flex-direction: column; align-items: flex-end; }
   .touch-right .row { display: flex; gap: 12px; }
 
+  #dive-controls {
+    display: none;
+    width: 100%;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    pointer-events: auto;
+    z-index: 2;
+  }
+  .dive-pad {
+    display: grid;
+    grid-template-columns: repeat(3, 58px);
+    grid-template-rows: repeat(3, 58px);
+    gap: 10px;
+    align-items: center;
+    justify-items: center;
+  }
+  .dive-pad-gap {
+    width: 58px;
+    height: 58px;
+    pointer-events: none;
+  }
+  .dive-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+  }
+
   .tbtn {
     position: relative;
     overflow: hidden;
@@ -253,7 +282,7 @@
     border-radius: 50%;
     background: radial-gradient(circle at 34% 28%, rgba(235,245,255,0.2) 0%, rgba(40, 48, 60, 0.7) 38%, rgba(12, 16, 22, 0.92) 100%);
     border: 2px solid rgba(220, 232, 248, 0.52);
-    color: #ddd;
+    color: #fdf;
     font-family: 'Press Start 2P', monospace;
     font-size: 22px;
     display: flex;
@@ -297,7 +326,7 @@
   }
   .tbtn.active {
     background: radial-gradient(circle at 34% 28%, rgba(245, 252, 255, 0.34) 0%, rgba(65, 75, 88, 0.76) 42%, rgba(16, 21, 28, 0.94) 100%);
-    border-color: #ddd;
+    border-color: #fdf;
     transform: scale(0.92);
     box-shadow:
       inset 0 0 12px rgba(155, 190, 220, 0.33),
@@ -333,7 +362,33 @@
       0 0 18px rgba(108, 204, 255, 0.52);
   }
 
+  .tbtn.dive {
+    width: 58px;
+    height: 58px;
+    font-size: 18px;
+    border-color: rgba(194, 232, 255, 0.68);
+  }
+  .tbtn.dive.zoom {
+    width: 64px;
+    height: 64px;
+    font-size: 24px;
+    border-color: rgba(152, 215, 255, 0.72);
+    color: #9fdfff;
+  }
+  .tbtn.dive.exit {
+    width: 84px;
+    height: 56px;
+    border-radius: 16px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    border-color: rgba(255, 130, 124, 0.8);
+    color: #ff9d95;
+  }
+
   body.mobile #touch-controls { display: flex; }
+  body.mobile.dive-active .touch-left,
+  body.mobile.dive-active .touch-right { display: none; }
+  body.mobile.dive-active #dive-controls { display: flex; }
 
   body.playing #game-wrap,
   body.playing #game-wrap * {

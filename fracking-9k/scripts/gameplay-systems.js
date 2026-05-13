@@ -29,8 +29,8 @@
       extraLife: () => {}
     };
 
-    const SAUCER_LARGE = options.SAUCER_LARGE || { r: 18, score: 200, speed: 90, fireRate: 1.6, accuracy: 0.0 };
-    const SAUCER_SMALL = options.SAUCER_SMALL || { r: 15, score: 1000, speed: 130, fireRate: 1.0, accuracy: 0.75 };
+    const SAUCER_LARGE = options.SAUCER_LARGE || { r: 17, score: 200, speed: 90, fireRate: 1.6, accuracy: 0.0 };
+    const SAUCER_SMALL = options.SAUCER_SMALL || { r: 17, score: 1000, speed: 130, fireRate: 1.0, accuracy: 0.75 };
     const BULLET_SPEED = options.BULLET_SPEED != null ? options.BULLET_SPEED : 540;
     const SHOCKWAVE_LIFE = options.SHOCKWAVE_LIFE != null ? options.SHOCKWAVE_LIFE : 0.62;
     const SHOCKWAVE_RADIUS_GAIN = options.SHOCKWAVE_RADIUS_GAIN != null ? options.SHOCKWAVE_RADIUS_GAIN : 2.2;
@@ -164,6 +164,7 @@
       const p1 = { x: 0, y: -radius };
       const p2 = { x: -radius * 0.866, y: radius * 0.5 };
       const p3 = { x: radius * 0.866, y: radius * 0.5 };
+      const baseWidth = Math.max(0.48, Math.min(0.92, radius * 0.04));
 
       strokeWithVectorGlow(ctx, () => {
         ctx.beginPath();
@@ -173,9 +174,13 @@
         drawKochSegment(p3.x, p3.y, p1.x, p1.y, depth);
         ctx.closePath();
       }, {
-        haloWidthMul: 1.9,
-        haloAlpha: 0.2,
-        blur: 4.8
+        baseWidth,
+        glowQuality: 'low',
+        haloWidthMul: 1.25,
+        haloAlpha: 0.12,
+        bodyWidthMul: 0.92,
+        coreWidthMul: 0.68,
+        blur: 2.8
       });
     }
 
@@ -185,8 +190,8 @@
       if (!saucer) return;
       ctx.save();
       ctx.translate(saucer.x, saucer.y);
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#fdf';
+      ctx.lineWidth = 1.2;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
       const r = saucer.r;
@@ -205,15 +210,20 @@
           blur: 5.2
         });
       } else if (saucerClass === 'koch') {
-        const depth = saucer.isSmall ? 1 : 2;
+        const depth = r < 19 ? 2 : (saucer.isSmall ? 2 : 3);
         drawKochSnowflake(r * 0.94, depth);
+        const coreWidth = Math.max(0.45, Math.min(0.92, r * 0.035));
         strokeWithVectorGlow(ctx, () => {
           ctx.beginPath();
-          ctx.arc(0, r * 0.08, r * 0.2, 0, Math.PI * 2);
+          ctx.arc(0, r * 0.08, r * 0.16, 0, Math.PI * 2);
         }, {
-          haloWidthMul: 2.1,
-          haloAlpha: 0.24,
-          blur: 5.2
+          baseWidth: coreWidth,
+          glowQuality: 'low',
+          haloWidthMul: 1.3,
+          haloAlpha: 0.14,
+          bodyWidthMul: 0.9,
+          coreWidthMul: 0.7,
+          blur: 2.8
         });
       } else {
         strokeWithVectorGlow(ctx, () => {
@@ -317,7 +327,7 @@
 
     function drawParticles() {
       if (!ctx) return;
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = '#fdf';
       for (const p of getParticles()) {
         ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
         ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
@@ -376,7 +386,7 @@
 
     function drawBullets() {
       if (!ctx) return;
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = '#fdf';
       for (const b of getBullets()) ctx.fillRect(b.x - 1.5, b.y - 1.5, 3, 3);
       for (const b of getSaucerBullets()) {
         const t = 1 - b.life;

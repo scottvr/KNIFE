@@ -374,6 +374,28 @@
   let fractaloidRuntimeSystem = null;
   let fractaloidCombatSystem = null;
   let gameplaySystems = null;
+  const DIVE_ACTION_TO_CODE = Object.freeze({
+    panLeft: 'ArrowLeft',
+    panRight: 'ArrowRight',
+    panUp: 'ArrowUp',
+    panDown: 'ArrowDown',
+    zoomOut: 'Minus',
+    zoomIn: 'Equal',
+    reset: 'KeyR',
+    exit: 'Escape'
+  });
+
+  function diveActionFromCode(code) {
+    if (code === 'ArrowLeft' || code === 'KeyA') return 'panLeft';
+    if (code === 'ArrowRight' || code === 'KeyD') return 'panRight';
+    if (code === 'ArrowUp' || code === 'KeyW') return 'panUp';
+    if (code === 'ArrowDown' || code === 'KeyS') return 'panDown';
+    if (code === 'Minus' || code === 'NumpadSubtract' || code === 'KeyQ') return 'zoomOut';
+    if (code === 'Equal' || code === 'NumpadAdd' || code === 'KeyE') return 'zoomIn';
+    if (code === 'KeyR') return 'reset';
+    if (code === 'Escape') return 'exit';
+    return null;
+  }
 
   function nudgeFractalDive(code, shiftKey = false) {
     if (state !== 'fractaldive' || !fractaloidRuntimeSystem) return false;
@@ -382,9 +404,64 @@
     });
   }
 
+  function nudgeFractalDiveAction(action, shiftKey = false) {
+    const code = DIVE_ACTION_TO_CODE[action];
+    if (!code) return false;
+    return nudgeFractalDive(code, shiftKey);
+  }
+
+  function bindDiveTouchControl(id, action, opts = {}) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const repeatMs = opts.repeatMs != null ? opts.repeatMs : 0;
+    const shiftKey = !!opts.shiftKey;
+    let holdTimer = null;
+
+    const clearHold = () => {
+      if (holdTimer != null) {
+        clearInterval(holdTimer);
+        holdTimer = null;
+      }
+      el.classList.remove('active');
+    };
+
+    const trigger = () => {
+      if (state !== 'fractaldive') {
+        clearHold();
+        return;
+      }
+      nudgeFractalDiveAction(action, shiftKey);
+    };
+
+    const press = (e) => {
+      if (state !== 'fractaldive') return;
+      if (e && typeof e.preventDefault === 'function') e.preventDefault();
+      ensureAudio();
+      el.classList.add('active');
+      trigger();
+      if (repeatMs > 0 && holdTimer == null) {
+        holdTimer = setInterval(trigger, repeatMs);
+      }
+    };
+
+    const release = (e) => {
+      if (e && typeof e.preventDefault === 'function') e.preventDefault();
+      clearHold();
+    };
+
+    el.addEventListener('touchstart', press, { passive: false });
+    el.addEventListener('touchend', release, { passive: false });
+    el.addEventListener('touchcancel', release, { passive: false });
+    el.addEventListener('mousedown', press);
+    el.addEventListener('mouseup', release);
+    el.addEventListener('mouseleave', release);
+    window.addEventListener('blur', clearHold);
+  }
+
   window.addEventListener('keydown', (e) => {
     if (state !== 'fractaldive') return;
-    if (nudgeFractalDive(e.code, !!e.shiftKey)) e.preventDefault();
+    const action = diveActionFromCode(e.code);
+    if (action && nudgeFractalDiveAction(action, !!e.shiftKey)) e.preventDefault();
   });
 
   window.addEventListener('wheel', (e) => {
@@ -399,6 +476,15 @@
       e.preventDefault();
     }
   });
+
+  bindDiveTouchControl('btn-dive-left', 'panLeft', { repeatMs: 56 });
+  bindDiveTouchControl('btn-dive-right', 'panRight', { repeatMs: 56 });
+  bindDiveTouchControl('btn-dive-up', 'panUp', { repeatMs: 56 });
+  bindDiveTouchControl('btn-dive-down', 'panDown', { repeatMs: 56 });
+  bindDiveTouchControl('btn-dive-zoom-in', 'zoomIn', { repeatMs: 84 });
+  bindDiveTouchControl('btn-dive-zoom-out', 'zoomOut', { repeatMs: 84 });
+  bindDiveTouchControl('btn-dive-reset', 'reset');
+  bindDiveTouchControl('btn-dive-exit', 'exit');
 
   // ============================================================
   // GAME STATE
@@ -489,11 +575,11 @@
 
   // Tunable constants (classic-ish)
   const SHIP_SIZE = 20;
-  const SHIP_TURN = 3.0 // rad/s
+  const SHIP_TURN = 4.62 // rad/s
   const SHIP_THRUST = 220; // px/s^2
   const SHIP_FRICTION = 0.4; // per second
   const SHIP_MAX_SPEED = 666;
-  const BULLET_SPEED = 666;
+  const BULLET_SPEED = 466;
   const BULLET_LIFE = 0.85;
   const MAX_BULLETS = 8; // power-of-two ammo ceiling
   const FIRE_COOLDOWN_BASE = 0.02;
@@ -669,8 +755,8 @@
     { name: 'Needle', focusX: -1.25066, focusY: 0.02012, seedBias: 0.56, spread: 0.62, zoomBase: 1.86 },
     { name: 'Elephant', focusX: 0.285, focusY: 0.012, seedBias: 0.78, spread: 0.72, zoomBase: 1.78 }
   ];
-  const SAUCER_LARGE = { r: 24, score: 200, speed: 90, fireRate: 1.6, accuracy: 0.0 };
-  const SAUCER_SMALL = { r: 22, score: 1000, speed: 130, fireRate: 1.0, accuracy: 0.75 };
+  const SAUCER_LARGE = { r: 17, score: 200, speed: 90, fireRate: 1.6, accuracy: 0.0 };
+  const SAUCER_SMALL = { r: 17, score: 1000, speed: 130, fireRate: 1.0, accuracy: 0.75 };
   gameplaySystems = (window.FrackingGameplaySystems && typeof window.FrackingGameplaySystems.create === 'function')
     ? window.FrackingGameplaySystems.create({
         ctx,
@@ -1069,11 +1155,12 @@
     ctx.scale(scale, scale);
     ctx.translate(-cx, -cy);
     ctx.lineWidth = SHIP_ICON_STROKE_WIDTH;
+    ctx.lineStyle = "#fff"
     strokeWithVectorGlow(ctx, () => {}, {
       baseWidth: SHIP_ICON_STROKE_WIDTH,
-      haloWidthMul: 2.1,
-      haloAlpha: 0.22,
-      blur: 5.8,
+      haloWidthMul: 0.3,
+      haloAlpha: 0.8,
+      blur: 0.5,
       path: shipIconPath
     });
     ctx.restore();
@@ -1096,14 +1183,13 @@
   function drawShip(s) {
     if (!s.alive) return;
     if (s.invuln > 0) {
-      // blink
       s.blink += 1;
       if (Math.floor(s.blink / 4) % 2 === 0) return;
     }
     ctx.save();
     ctx.translate(s.x, s.y);
     ctx.rotate(s.angle);
-    ctx.strokeStyle = '#fff';
+    ctx.strokeStyle = '#fdf';
     ctx.lineWidth = 1.3;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
@@ -1568,6 +1654,10 @@
     target.spawnTelegraphHue = fractaloidEffects.modeTelegraphHue(seeded.mode);
   }
 
+  function setDiveUiActive(active) {
+    document.body.classList.toggle('dive-active', !!active);
+  }
+
   function enterFractalDive(target, hitPoint = null, opts = null) {
     if (!target || !fractaloidRuntimeSystem) return;
     const options = opts || {};
@@ -1578,7 +1668,10 @@
       randomizeClass: !!options.randomizeClass,
       randomizeClassFn: randomizeFractalDiveTarget
     });
-    if (entered) state = 'fractaldive';
+    if (entered) {
+      state = 'fractaldive';
+      setDiveUiActive(true);
+    }
   }
 
   function maybeEnterFractalDive(target, hitPoint = null) {
@@ -1596,7 +1689,10 @@
       width: W,
       height: H
     });
-    if (entered) state = 'fractaldive';
+    if (entered) {
+      state = 'fractaldive';
+      setDiveUiActive(true);
+    }
     return entered;
   }
 
@@ -1613,11 +1709,13 @@
   function exitFractalDive() {
     if (!fractaloidRuntimeSystem) {
       state = 'playing';
+      setDiveUiActive(false);
       return;
     }
     const a = fractaloidRuntimeSystem.consumeDiveTarget();
     if (!a) {
       state = 'playing';
+      setDiveUiActive(false);
       return;
     }
     const idx = fractaloids.indexOf(a);
@@ -1633,6 +1731,7 @@
     } else {
       state = 'playing';
     }
+    setDiveUiActive(false);
   }
 
   function awardFractaloidScore(baseScore) {
@@ -1746,9 +1845,9 @@
     if (bootBlocked) return;
     ensureAudio();
     score = 0;
-    lives =9;
+    lives = 6;
     wave = 1;
-    nextExtraLife = 10000;
+    nextExtraLife = 15000;
     heartbeatSystem.reset();
     bullets = [];
     fractaloids = [];
@@ -1765,6 +1864,7 @@
     wavePace = { spawnMul: 1, speedMul: 1, saucerCadenceMul: 1 };
     ship = makeShip();
     state = 'playing';
+    setDiveUiActive(false);
     document.body.classList.add('playing');
     document.getElementById('title-screen').classList.add('hidden');
     document.getElementById('gameover-screen').classList.add('hidden');
@@ -1779,6 +1879,7 @@
     deathLifeSpent = false;
     inputFeelSystem.reset();
     activeThreatCues = [];
+    setDiveUiActive(false);
     document.body.classList.remove('playing');
     document.getElementById('final-score').textContent = 'SCORE: ' + score.toString().padStart(6, '0');
     document.getElementById('gameover-screen').classList.remove('hidden');
@@ -2041,7 +2142,7 @@
         stateTimer -= dt;
         // big wave text
         ctx.save();
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = '#fdf';
         ctx.font = 'bold 32px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
