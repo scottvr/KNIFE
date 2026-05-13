@@ -635,14 +635,14 @@
         deriveMandelZoomFloorRatio: () => 0.9,
         centerFractaloidView: (mode, jx, jy, fx, fy) => ({ fx, fy }),
         getJuliaAreaScale: () => 1.0
-      };
+      }
   const FRACTALOID_PALETTE_MODES = { cosmic: 0, ember: 1, firefly: 2, gold: 3, plasma: 4 };
   const FRACTALOID_PERIMETER_MODE = 'none'; // 'none' | 'polygon'
   const FRACTALOID_COLORIZER_MODE = 'classic'; // 'classic' | 'enhanced'
   const FRACTALOID_COLORIZER_ENHANCED = FRACTALOID_COLORIZER_MODE === 'enhanced';
   const FRACTALOID_ENHANCED_LIFTMIX = false; // set true to re-enable luma-lift rescue in enhanced mode
-  const FRACTALOID_CHROMA_TWEAK = FRACTALOID_COLORIZER_MODE === 'enhanced' ? 1.0 : 0.0; // rescue boosts are enhanced-only
-  const FRACTALOID_NEON_TWEAK = FRACTALOID_COLORIZER_MODE === 'enhanced' ? 1.0 : 1.0; // boosted glow path is enhanced-only (temporaraily enabled in classic mode deliberately for testing.)
+  const FRACTALOID_CHROMA_TWEAK = FRACTALOID_COLORIZER_MODE === 'enhanced' ? 1.0 : 0.1; // rescue boosts are enhanced-only
+  const FRACTALOID_NEON_TWEAK = FRACTALOID_COLORIZER_MODE === 'enhanced' ? 1.0 : 0.1; // boosted glow path is enhanced-only (temporaraily enabled in classic mode deliberately for testing.)
   const SAUCER_FRACTAL_CLASS = 'cycle'; // 'cycle' | 'classic' | 'sierpinski' | 'koch'
   const SAUCER_FRACTAL_CLASSES = ['classic', 'sierpinski', 'koch'];
   const shipIconAsset = window.FrackingShipIcon || null;
@@ -1169,9 +1169,9 @@
     ctx.lineStyle = "#fff"
     strokeWithVectorGlow(ctx, () => {}, {
       baseWidth: SHIP_ICON_STROKE_WIDTH,
-      haloWidthMul: 0.01,
+      haloWidthMul: 0.03,
       haloAlpha: 0.5,
-      blur: 0.2,
+      blur: 3.2,
       path: shipIconPath
     });
     ctx.restore();
