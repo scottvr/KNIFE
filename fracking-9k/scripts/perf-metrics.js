@@ -151,10 +151,21 @@
       const stats = buildStats(rollingSamples);
       const meta = metaProvider() || {};
       const captureLabel = activeCapture ? activeCapture.label : '-';
+      const geometryBlock = meta.viewportRect || meta.playfieldRect || meta.worldRect || meta.render2dRect || meta.renderFractalRect
+        ? (
+            `geo ${meta.geometryMode || 'default'}\n` +
+            `viewport ${meta.viewportRect || meta.viewport || 'n/a'}\n` +
+            `playfield ${meta.playfieldRect || 'n/a'}\n` +
+            `world ${meta.worldRect || meta.world || 'n/a'}\n` +
+            `render2d ${meta.render2dRect || meta.render || 'n/a'}  gl ${meta.renderFractalRect || 'n/a'}\n` +
+            `scale css/world ${meta.worldToPlayfieldScale || 'n/a'}  dpr ${meta.dpr != null ? meta.dpr : 'n/a'} ds ${meta.displayScale != null ? meta.displayScale : 'n/a'}\n`
+          )
+        : '';
       overlayEl.textContent =
         `Perf (${meta.mode || 'mode?'} | ${meta.state || 'state?'})\n` +
         `fps ${fmt(stats.fpsAvg, 1)}  frame ${fmt(stats.frameMsAvg)}ms p95 ${fmt(stats.frameMsP95)} p99 ${fmt(stats.frameMsP99)}\n` +
         `cpu ${fmt(stats.cpuMsAvg)}ms p95 ${fmt(stats.cpuMsP95)}  slow16 ${fmt(stats.slowFramePct16, 1)}% slow33 ${fmt(stats.slowFramePct33, 1)}%\n` +
+        geometryBlock +
         `ents f=${fmt(stats.entitiesAvg.fractaloids, 1)} b=${fmt(stats.entitiesAvg.bullets, 1)} sb=${fmt(stats.entitiesAvg.saucerBullets, 1)} p=${fmt(stats.entitiesAvg.particles, 1)} sw=${fmt(stats.entitiesAvg.shockwaves, 1)}\n` +
         `cap: ${captureLabel}  samples=${stats.sampleCount}`;
     }

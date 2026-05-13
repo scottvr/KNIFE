@@ -254,6 +254,8 @@
   let W = 0, H = 0, DPR = 1;
   let VIEW_W = 0, VIEW_H = 0;
   let DISPLAY_SCALE = 1;
+  let PLAYFIELD_X = 0, PLAYFIELD_Y = 0;
+  let PLAYFIELD_W = 0, PLAYFIELD_H = 0;
 
   function placeCanvasLayer(layer, x, y, width, height) {
     if (!layer) return;
@@ -301,6 +303,10 @@
       const offsetX = Math.floor((wrapWidth - displayWidth) * 0.5);
       const offsetY = Math.floor((wrapHeight - displayHeight) * 0.5);
       DISPLAY_SCALE = displayScale;
+      PLAYFIELD_X = offsetX;
+      PLAYFIELD_Y = offsetY;
+      PLAYFIELD_W = displayWidth;
+      PLAYFIELD_H = displayHeight;
       placeCanvasLayer(canvas, offsetX, offsetY, displayWidth, displayHeight);
       canvas.width = ARCADE_WIDTH;
       canvas.height = ARCADE_HEIGHT;
@@ -315,6 +321,10 @@
       W = wrapWidth;
       H = wrapHeight;
       DISPLAY_SCALE = 1;
+      PLAYFIELD_X = 0;
+      PLAYFIELD_Y = 0;
+      PLAYFIELD_W = W;
+      PLAYFIELD_H = H;
       placeCanvasLayer(canvas, 0, 0, W, H);
       canvas.width = Math.floor(W * DPR);
       canvas.height = Math.floor(H * DPR);
@@ -545,15 +555,22 @@
     ? window.FrackingPerfMetrics.create({
         overlayVisible: perfOverlayEnabledByQuery,
         metaProvider: () => ({
+          geometryMode: IS_NATIVE_RENDER ? 'locked-native' : 'fixed-world+scaled-display',
           mode: IS_NATIVE_RENDER ? 'native' : 'arcade_640',
           glowQuality: ACTIVE_GLOW_QUALITY,
           arcadeBase: `${ARCADE_WIDTH}x${ARCADE_HEIGHT}`,
           state,
           wave,
           viewport: `${VIEW_W}x${VIEW_H}`,
+          viewportRect: `x=0 y=0 w=${VIEW_W} h=${VIEW_H}`,
+          playfieldRect: `x=${PLAYFIELD_X} y=${PLAYFIELD_Y} w=${PLAYFIELD_W} h=${PLAYFIELD_H}`,
           world: `${W}x${H}`,
+          worldRect: `x=0 y=0 w=${W} h=${H}`,
+          worldToPlayfieldScale: `${(PLAYFIELD_W / Math.max(1, W)).toFixed(3)}x ${(PLAYFIELD_H / Math.max(1, H)).toFixed(3)}y`,
           displayScale: DISPLAY_SCALE,
           render: `${canvas ? canvas.width : 0}x${canvas ? canvas.height : 0}`,
+          render2dRect: `w=${canvas ? canvas.width : 0} h=${canvas ? canvas.height : 0}`,
+          renderFractalRect: `w=${fractalCanvas ? fractalCanvas.width : 0} h=${fractalCanvas ? fractalCanvas.height : 0}`,
           dpr: DPR,
           maxFps: MAX_FPS > 0 ? MAX_FPS : 'uncapped'
         })
@@ -615,7 +632,7 @@
   const BULLET_SPEED = 466;
   const BULLET_LIFE = 0.85;
   const MAX_BULLETS = 8; // power-of-two ammo ceiling
-  const FIRE_COOLDOWN_BASE = 0.02;
+  const FIRE_COOLDOWN_BASE = 0.025;
   const FIRE_PATTERN = [ 8, 4, 2, 2, 1 ];
   const SHIP_FRACTAL_CLASS = 'mandelbrot_outline'; // 'sierpinski' | 'mandelbrot_outline'
   const SHIP_FRACTAL_CLASSES = ['sierpinski', 'mandelbrot_outline'];
