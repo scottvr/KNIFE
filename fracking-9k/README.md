@@ -8,6 +8,12 @@ Part of the [sloopygames.com](https://sloopygames.com) collection.
 
 Open `index.html` in any modern browser. No build step is required; the game runs from static HTML, CSS, and vanilla JavaScript files and loads optional Google Fonts from the web. Rendering and zooming real-time Mandelbrot and Julia sets does require GLSL (and so a WebGL-compatible GPU)a.
 
+### Launch URL Parameters
+
+- `arcadeRes` / `arcade_res`: `640x480`, `480x640`, `1024x768`, `768x1024`, `1280x960`, `960x1280`
+- `scale_mode` / `scaleMode`: `integer` (pixel-perfect letterbox), `fit` (aspect-safe non-integer fill), `stretch` (full fill, aspect-stretched)
+- `fullscreen`: `1` / `0` / `toggle`
+
 ## How to Play
 
 - Blast every fractaloid in the wave to advance to the next, faster wave.

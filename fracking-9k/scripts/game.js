@@ -106,6 +106,28 @@
   if (arcadeResQueryRaw && !ARCADE_RES_PRESETS[arcadeResQueryRaw]) {
     console.warn(`[Render mode] Unknown arcade resolution "${arcadeResQueryRaw}". Falling back to "${ARCADE_RES_DEFAULT}".`);
   }
+  const arcadeScaleModeQueryRaw = (
+    urlParams.get('scale_mode') ||
+    urlParams.get('scaleMode') ||
+    urlParams.get('arcade_scale_mode') ||
+    urlParams.get('arcadeScaleMode') ||
+    ''
+  ).trim().toLowerCase();
+  const ARCADE_SCALE_MODE_DEFAULT = 'integer';
+  const ARCADE_SCALE_MODE = (() => {
+    if (!arcadeScaleModeQueryRaw) return ARCADE_SCALE_MODE_DEFAULT;
+    if (arcadeScaleModeQueryRaw === 'integer' || arcadeScaleModeQueryRaw === 'fit' || arcadeScaleModeQueryRaw === 'stretch') {
+      return arcadeScaleModeQueryRaw;
+    }
+    if (arcadeScaleModeQueryRaw === 'int' || arcadeScaleModeQueryRaw === 'pixel' || arcadeScaleModeQueryRaw === 'pixel-perfect') {
+      return 'integer';
+    }
+    if (arcadeScaleModeQueryRaw === 'fill') {
+      return 'stretch';
+    }
+    console.warn(`[Render mode] Unknown scale mode "${arcadeScaleModeQueryRaw}". Falling back to "${ARCADE_SCALE_MODE_DEFAULT}".`);
+    return ARCADE_SCALE_MODE_DEFAULT;
+  })();
   const crtScanlinesQueryRaw = (urlParams.get('scanlines') || urlParams.get('crt_scanlines') || urlParams.get('crtScanlines') || '').trim();
   const crtScanlinesQueryParsed = Number(crtScanlinesQueryRaw);
   const CRT_SCANLINES_OVERRIDE = (() => {
@@ -418,6 +440,7 @@
   let W = 0, H = 0, DPR = 1;
   let VIEW_W = 0, VIEW_H = 0;
   let DISPLAY_SCALE = 1;
+  let DISPLAY_SCALE_X = 1, DISPLAY_SCALE_Y = 1;
   let PLAYFIELD_X = 0, PLAYFIELD_Y = 0;
   let PLAYFIELD_W = 0, PLAYFIELD_H = 0;
 
@@ -456,17 +479,43 @@
     VIEW_H = wrapHeight;
     if (IS_ARCADE_640) {
       DPR = 1;
-      // Task 2 + Task 3: fixed low-res internal buffers with centered integer upscale + letterbox.
+      // Fixed low-res internal buffers with selectable display scaling behavior.
       W = ARCADE_WIDTH;
       H = ARCADE_HEIGHT;
       const fitScale = Math.min(wrapWidth / ARCADE_WIDTH, wrapHeight / ARCADE_HEIGHT);
-      const intScale = Math.floor(fitScale);
-      const displayScale = intScale >= 1 ? intScale : Math.max(0.1, fitScale);
-      const displayWidth = Math.max(1, Math.round(ARCADE_WIDTH * displayScale));
-      const displayHeight = Math.max(1, Math.round(ARCADE_HEIGHT * displayScale));
-      const offsetX = Math.floor((wrapWidth - displayWidth) * 0.5);
-      const offsetY = Math.floor((wrapHeight - displayHeight) * 0.5);
-      DISPLAY_SCALE = displayScale;
+      let displayScale = Math.max(0.1, fitScale);
+      let displayWidth = Math.max(1, Math.round(ARCADE_WIDTH * displayScale));
+      let displayHeight = Math.max(1, Math.round(ARCADE_HEIGHT * displayScale));
+      let offsetX = Math.floor((wrapWidth - displayWidth) * 0.5);
+      let offsetY = Math.floor((wrapHeight - displayHeight) * 0.5);
+      let displayScaleX = displayWidth / Math.max(1, ARCADE_WIDTH);
+      let displayScaleY = displayHeight / Math.max(1, ARCADE_HEIGHT);
+
+      if (ARCADE_SCALE_MODE === 'integer') {
+        const intScale = Math.floor(fitScale);
+        displayScale = intScale >= 1 ? intScale : Math.max(0.1, fitScale);
+        displayWidth = Math.max(1, Math.round(ARCADE_WIDTH * displayScale));
+        displayHeight = Math.max(1, Math.round(ARCADE_HEIGHT * displayScale));
+        offsetX = Math.floor((wrapWidth - displayWidth) * 0.5);
+        offsetY = Math.floor((wrapHeight - displayHeight) * 0.5);
+        displayScaleX = displayScale;
+        displayScaleY = displayScale;
+      } else if (ARCADE_SCALE_MODE === 'stretch') {
+        displayWidth = Math.max(1, wrapWidth);
+        displayHeight = Math.max(1, wrapHeight);
+        offsetX = 0;
+        offsetY = 0;
+        displayScaleX = displayWidth / Math.max(1, ARCADE_WIDTH);
+        displayScaleY = displayHeight / Math.max(1, ARCADE_HEIGHT);
+      } else {
+        // "fit" keeps aspect ratio, but allows non-integer upscale for bigger cabinet fill.
+        displayScaleX = displayScale;
+        displayScaleY = displayScale;
+      }
+
+      DISPLAY_SCALE = Math.min(displayScaleX, displayScaleY);
+      DISPLAY_SCALE_X = displayScaleX;
+      DISPLAY_SCALE_Y = displayScaleY;
       PLAYFIELD_X = offsetX;
       PLAYFIELD_Y = offsetY;
       PLAYFIELD_W = displayWidth;
@@ -485,6 +534,8 @@
       W = wrapWidth;
       H = wrapHeight;
       DISPLAY_SCALE = 1;
+      DISPLAY_SCALE_X = 1;
+      DISPLAY_SCALE_Y = 1;
       PLAYFIELD_X = 0;
       PLAYFIELD_Y = 0;
       PLAYFIELD_W = W;
@@ -738,6 +789,7 @@
         metaProvider: () => ({
           geometryMode: IS_NATIVE_RENDER ? 'locked-native' : 'fixed-world+scaled-display',
           mode: IS_NATIVE_RENDER ? 'native' : 'arcade_640',
+          scaleMode: IS_NATIVE_RENDER ? 'native' : ARCADE_SCALE_MODE,
           glowQuality: ACTIVE_GLOW_QUALITY,
           arcadeBase: `${ARCADE_WIDTH}x${ARCADE_HEIGHT}`,
           state,
@@ -749,6 +801,7 @@
           worldRect: `x=0 y=0 w=${W} h=${H}`,
           worldToPlayfieldScale: `${(PLAYFIELD_W / Math.max(1, W)).toFixed(3)}x ${(PLAYFIELD_H / Math.max(1, H)).toFixed(3)}y`,
           displayScale: DISPLAY_SCALE,
+          displayScaleXY: `${DISPLAY_SCALE_X.toFixed(3)}x ${DISPLAY_SCALE_Y.toFixed(3)}y`,
           render: `${canvas ? canvas.width : 0}x${canvas ? canvas.height : 0}`,
           render2dRect: `w=${canvas ? canvas.width : 0} h=${canvas ? canvas.height : 0}`,
           renderFractalRect: `w=${fractalCanvas ? fractalCanvas.width : 0} h=${fractalCanvas ? fractalCanvas.height : 0}`,
@@ -2244,6 +2297,8 @@
       worldWidth: W,
       worldHeight: H,
       displayScale: DISPLAY_SCALE,
+      displayScaleX: DISPLAY_SCALE_X,
+      displayScaleY: DISPLAY_SCALE_Y,
       renderWidth: canvas ? canvas.width : 0,
       renderHeight: canvas ? canvas.height : 0,
       dpr: DPR,
