@@ -924,7 +924,7 @@
     : { x: 1.1, y: 0.45, w: 5.6, h: 5.6 };
   const SHIP_ICON_STROKE_WIDTH = shipIconAsset && typeof shipIconAsset.strokeWidth === 'number'
     ? shipIconAsset.strokeWidth
-    : 0.13;
+    : 0.03;
   let shipIconPath = null;
   if (typeof Path2D === 'function' && shipIconAsset && typeof shipIconAsset.pathD === 'string') {
     try {
