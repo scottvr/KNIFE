@@ -68,14 +68,18 @@
         <span class="key">←</span> <span class="key">→</span> rotate &nbsp;
         <span class="key">↑</span> thrust<br>
         <span class="key">SPACE</span> blast &nbsp;
-        <span class="key">SHIFT</span> hyperspace
+        <span class="key">SHIFT</span> hyperspace<br>
+        <span class="key">F</span> full screen
       </div>
       <div class="instructions hidden" id="mobile-instr">
         tap buttons to rotate, thrust,<br>
         fire, and hyperspace<br>
         <span style="opacity:0.6;">Do you have what it takes to be the FRAC KING?</span>
       </div>
-      <button class="btn" id="start-btn">PRESS START</button>
+      <div class="utility-actions">
+        <button class="btn" id="start-btn">PRESS START</button>
+        <button class="btn utility" id="fullscreen-btn" aria-pressed="false">FULL SCREEN</button>
+      </div>
     </div>
     <div class="credit">© 19XX KNIFEtroniks</div>
   </div>
@@ -87,7 +91,10 @@
       <h1 class="title" style="font-size: clamp(28px, 8vw, 64px);">GAME OVER</h1>
       <div class="subtitle" id="final-score">SCORE: 0</div>
       <div class="instructions">your ship is now space gravel</div>
-      <button class="btn" id="restart-btn">TRY AGAIN</button>
+      <div class="utility-actions">
+        <button class="btn" id="restart-btn">TRY AGAIN</button>
+        <button class="btn utility" id="fullscreen-btn-gameover" aria-pressed="false">FULL SCREEN</button>
+      </div>
     </div>
   </div>
 </div>

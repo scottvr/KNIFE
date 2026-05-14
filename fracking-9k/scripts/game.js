@@ -120,6 +120,27 @@
     }
     return clamped;
   })();
+  const fullscreenQueryRaw = (urlParams.get('fullscreen') || urlParams.get('full_screen') || urlParams.get('fullScreen') || '').trim().toLowerCase();
+  const FULLSCREEN_QUERY_ACTION = (() => {
+    if (!fullscreenQueryRaw) return 'none'; // none | enter | exit | toggle
+    if (
+      fullscreenQueryRaw === '1' ||
+      fullscreenQueryRaw === 'true' ||
+      fullscreenQueryRaw === 'on' ||
+      fullscreenQueryRaw === 'yes' ||
+      fullscreenQueryRaw === 'enter'
+    ) return 'enter';
+    if (
+      fullscreenQueryRaw === '0' ||
+      fullscreenQueryRaw === 'false' ||
+      fullscreenQueryRaw === 'off' ||
+      fullscreenQueryRaw === 'no' ||
+      fullscreenQueryRaw === 'exit'
+    ) return 'exit';
+    if (fullscreenQueryRaw === 'toggle') return 'toggle';
+    console.warn(`[Launch options] Unknown fullscreen value "${fullscreenQueryRaw}". Valid values: 1|0|toggle.`);
+    return 'none';
+  })();
   const ARCADE_WIDTH = ARCADE_RES_PRESETS[arcadeResKey].w;
   const ARCADE_HEIGHT = ARCADE_RES_PRESETS[arcadeResKey].h;
   const ARCADE_GLOW_QUALITY = 'medium'; // 'low' | 'medium' | 'high'
@@ -200,6 +221,143 @@
     document.getElementById('desktop-instr').classList.add('hidden');
     document.getElementById('mobile-instr').classList.remove('hidden');
   }
+
+  function fullscreenElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement || null;
+  }
+
+  function canToggleFullscreen() {
+    const root = document.documentElement;
+    return !!(root && (root.requestFullscreen || root.webkitRequestFullscreen || root.msRequestFullscreen));
+  }
+
+  function updateFullscreenUi() {
+    const active = !!fullscreenElement();
+    const supported = canToggleFullscreen();
+    document.body.classList.toggle('is-fullscreen', active);
+    const buttonIds = ['fullscreen-btn', 'fullscreen-btn-gameover'];
+    for (const id of buttonIds) {
+      const btn = document.getElementById(id);
+      if (!btn) continue;
+      if (!supported) {
+        btn.disabled = true;
+        btn.setAttribute('aria-pressed', 'false');
+        btn.textContent = 'FULL SCREEN N/A';
+        btn.title = 'Fullscreen API unavailable in this browser.';
+        continue;
+      }
+      btn.disabled = false;
+      btn.removeAttribute('title');
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      btn.textContent = active ? 'EXIT FULLSCREEN' : 'FULL SCREEN';
+    }
+  }
+
+  async function enterFullscreen() {
+    const root = document.documentElement;
+    if (!root) return false;
+    const request = root.requestFullscreen || root.webkitRequestFullscreen || root.msRequestFullscreen;
+    if (!request) return false;
+    try {
+      const maybePromise = request.call(root);
+      if (maybePromise && typeof maybePromise.then === 'function') {
+        await maybePromise;
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Fullscreen] Request denied or failed.', err);
+      return false;
+    }
+  }
+
+  async function exitFullscreen() {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+    if (!exit) return false;
+    try {
+      const maybePromise = exit.call(document);
+      if (maybePromise && typeof maybePromise.then === 'function') {
+        await maybePromise;
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Fullscreen] Exit failed.', err);
+      return false;
+    }
+  }
+
+  async function toggleFullscreen() {
+    if (!canToggleFullscreen()) return false;
+    if (fullscreenElement()) {
+      return exitFullscreen();
+    }
+    return enterFullscreen();
+  }
+
+  function bindFullscreenButtons() {
+    const buttonIds = ['fullscreen-btn', 'fullscreen-btn-gameover'];
+    for (const id of buttonIds) {
+      const btn = document.getElementById(id);
+      if (!btn) continue;
+      btn.addEventListener('click', (e) => {
+        if (e && typeof e.preventDefault === 'function') e.preventDefault();
+        void toggleFullscreen();
+      });
+    }
+  }
+
+  let pendingFullscreenQueryAction = FULLSCREEN_QUERY_ACTION;
+  let fullscreenQueryRetryBound = false;
+
+  async function applyFullscreenQueryAction() {
+    const action = pendingFullscreenQueryAction;
+    if (action === 'none') return true;
+    if (!canToggleFullscreen()) {
+      pendingFullscreenQueryAction = 'none';
+      return false;
+    }
+    const active = !!fullscreenElement();
+    let ok = true;
+    if (action === 'enter') {
+      ok = active ? true : await enterFullscreen();
+    } else if (action === 'exit') {
+      ok = active ? await exitFullscreen() : true;
+    } else if (action === 'toggle') {
+      ok = await toggleFullscreen();
+    }
+    if (ok || action === 'exit') {
+      pendingFullscreenQueryAction = 'none';
+    }
+    return ok;
+  }
+
+  function bindFullscreenQueryRetryOnGesture() {
+    if (fullscreenQueryRetryBound || pendingFullscreenQueryAction === 'none') return;
+    fullscreenQueryRetryBound = true;
+    const tryOnce = () => {
+      window.removeEventListener('pointerdown', tryOnce);
+      window.removeEventListener('keydown', tryOnce);
+      fullscreenQueryRetryBound = false;
+      void applyFullscreenQueryAction();
+    };
+    window.addEventListener('pointerdown', tryOnce, { passive: true });
+    window.addEventListener('keydown', tryOnce);
+  }
+
+  if (!canToggleFullscreen()) {
+    noteBootWarning('Fullscreen API unavailable in this browser; use browser-level fullscreen if available.');
+  }
+
+  const onFullscreenChange = () => {
+    updateFullscreenUi();
+    resize();
+  };
+  window.addEventListener('fullscreenchange', onFullscreenChange);
+  window.addEventListener('webkitfullscreenchange', onFullscreenChange);
+  if (pendingFullscreenQueryAction !== 'none') {
+    void applyFullscreenQueryAction();
+    bindFullscreenQueryRetryOnGesture();
+  }
+
   if (fractalRenderer && typeof fractalRenderer.setCrtBlack === 'function') {
     fractalRenderer.setCrtBlack(CRT_CLEAR_RGB);
   }
@@ -526,6 +684,23 @@
     }
   });
 
+  window.addEventListener('keydown', (e) => {
+    if (e.defaultPrevented || e.repeat) return;
+    if (e.code !== 'KeyF') return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const target = e.target;
+    if (
+      target &&
+      (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      )
+    ) return;
+    e.preventDefault();
+    void toggleFullscreen();
+  });
+
   bindDiveTouchControl('btn-dive-left', 'panLeft', { repeatMs: 56 });
   bindDiveTouchControl('btn-dive-right', 'panRight', { repeatMs: 56 });
   bindDiveTouchControl('btn-dive-up', 'panUp', { repeatMs: 56 });
@@ -637,8 +812,8 @@
   const SHIP_MAX_SPEED = 666;
   const BULLET_SPEED = 466;
   const BULLET_LIFE = 0.85;
-  const MAX_BULLETS = 8; // power-of-two ammo ceiling
-  const FIRE_COOLDOWN_BASE = 0.025;
+  const MAX_BULLETS = 16; // power-of-two ammo ceiling
+  const FIRE_COOLDOWN_BASE = 0.0275;
   const FIRE_PATTERN = [ 8, 4, 2, 2, 1 ];
   const SHIP_FRACTAL_CLASS = 'mandelbrot_outline'; // 'sierpinski' | 'mandelbrot_outline'
   const SHIP_FRACTAL_CLASSES = ['sierpinski', 'mandelbrot_outline'];
@@ -1899,6 +2074,7 @@
   // ============================================================
   function startGame() {
     if (bootBlocked) return;
+    void applyFullscreenQueryAction();
     ensureAudio();
     score = 0;
     lives = 6;
@@ -2016,6 +2192,8 @@
   }
 
   renderBootIssues();
+  bindFullscreenButtons();
+  updateFullscreenUi();
   document.getElementById('start-btn').addEventListener('click', startGame);
   document.getElementById('start-btn').addEventListener('touchend', (e) => { e.preventDefault(); startGame(); });
   document.getElementById('restart-btn').addEventListener('click', startGame);

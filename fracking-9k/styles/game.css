@@ -278,6 +278,10 @@
     transition: all 0.15s;
     pointer-events: auto;
   }
+  .btn:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
   .btn:hover, .btn:active {
     background: #fff;
     color: #090e14;
@@ -308,6 +312,31 @@
     pointer-events: none;
     background: radial-gradient(circle at center, rgba(250, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.04) 42%, rgba(255, 255, 255, 0) 72%);
     opacity: 0.66;
+  }
+
+  .utility-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .btn.utility {
+    font-size: clamp(11px, 2.2vw, 14px);
+    letter-spacing: 1px;
+    padding: 12px 18px;
+    border-width: 2px;
+    color: #9ed7ff;
+    border-color: rgba(158, 215, 255, 0.85);
+  }
+  .btn.utility:hover, .btn.utility:active {
+    background: #9ed7ff;
+    color: #090e14;
+    box-shadow: 0 0 20px rgba(158, 215, 255, 0.78);
+  }
+  .btn.utility[aria-pressed='true'] {
+    background: #9ed7ff;
+    color: #090e14;
   }
   
   @keyframes flicker {
@@ -506,6 +535,11 @@
   body.playing #game-wrap,
   body.playing #game-wrap * {
     cursor: none !important;
+  }
+
+  body.is-fullscreen #game,
+  body.is-fullscreen .overlay-screen {
+    border-radius: 0;
   }
 
   .hidden { display: none !important; }
