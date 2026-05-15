@@ -1,0 +1,748 @@
+
+<style>
+  :root {
+    --copro-bg-1: #100904;
+    --copro-bg-2: #2a1609;
+    --copro-bg-3: #1f1108;
+    --copro-ink: #f2d8a4;
+    --copro-muted: #cda872;
+    --copro-panel: rgba(33, 19, 11, 0.72);
+    --copro-line: rgba(255, 237, 201, 0.2);
+  }
+
+  #copro-app {
+    min-height: 100vh;
+    margin: 0;
+    display: grid;
+    place-items: center;
+    background:
+      radial-gradient(120% 120% at 50% 0%, #4a2912 0%, #25140a 45%, #130a05 100%),
+      linear-gradient(150deg, var(--copro-bg-1), var(--copro-bg-2), var(--copro-bg-3));
+    padding: 10px;
+    box-sizing: border-box;
+    font-family: "Trebuchet MS", "Lucida Sans Unicode", "Segoe UI", sans-serif;
+  }
+
+  #copro-stage {
+    position: relative;
+    width: min(98vw, 98vh);
+    height: min(98vw, 98vh);
+    max-width: 960px;
+    max-height: 960px;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 235, 190, 0.24);
+  }
+
+  #copro-stage::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.02) 0px,
+        rgba(255, 255, 255, 0.02) 1px,
+        transparent 1px,
+        transparent 4px
+      );
+    mix-blend-mode: soft-light;
+    z-index: 2;
+  }
+
+  #copro-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    background: #2a1a0e;
+    touch-action: none;
+  }
+
+  #copro-overlay-top {
+    position: absolute;
+    left: 10px;
+    top: 10px;
+    right: 10px;
+    z-index: 4;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: flex-start;
+    pointer-events: none;
+  }
+
+  #copro-hud {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  #copro-hud span {
+    display: inline-flex;
+    gap: 5px;
+    align-items: center;
+    background: var(--copro-panel);
+    border: 1px solid var(--copro-line);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font: 700 12px/1 "Consolas", "Courier New", monospace;
+    color: var(--copro-muted);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    backdrop-filter: blur(2px);
+  }
+
+  #copro-hud strong {
+    color: var(--copro-ink);
+    font-weight: 800;
+  }
+
+  #copro-controls {
+    display: inline-flex;
+    gap: 5px;
+    pointer-events: auto;
+  }
+
+  #copro-controls button {
+    border: 1px solid var(--copro-line);
+    color: var(--copro-ink);
+    background: var(--copro-panel);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font: 700 11px/1 "Consolas", "Courier New", monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    backdrop-filter: blur(2px);
+  }
+
+  #copro-controls button:hover {
+    background: rgba(55, 30, 16, 0.85);
+  }
+
+  #copro-controls button:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+
+  #copro-msg {
+    position: absolute;
+    z-index: 4;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    max-width: calc(100% - 150px);
+    text-align: center;
+    color: var(--copro-ink);
+    background: rgba(20, 10, 5, 0.7);
+    border: 1px solid rgba(255, 232, 193, 0.23);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    line-height: 1.1;
+    letter-spacing: 0.02em;
+    backdrop-filter: blur(3px);
+  }
+
+  .dpad {
+    position: absolute;
+    z-index: 5;
+    right: 12px;
+    bottom: 12px;
+    display: grid;
+    grid-template-columns: repeat(3, 34px);
+    grid-template-rows: repeat(3, 34px);
+    gap: 4px;
+    padding: 8px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(3px);
+    touch-action: manipulation;
+  }
+
+  .dpad button {
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.42);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #3d2616;
+    font: 700 18px/1 "Consolas", "Courier New", monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .dpad button:active,
+  .dpad button.is-active {
+    transform: translateY(1px);
+    background: rgba(255, 255, 255, 0.22);
+  }
+
+  .dpad .blank {
+    border: none;
+    background: transparent;
+    pointer-events: none;
+  }
+
+  @media (max-width: 700px) {
+    #copro-stage {
+      width: calc(100vw - 8px);
+      height: calc(100vw - 8px);
+    }
+
+    #copro-msg {
+      left: 10px;
+      transform: none;
+      max-width: calc(100% - 132px);
+      text-align: left;
+    }
+
+    .dpad {
+      grid-template-columns: repeat(3, 38px);
+      grid-template-rows: repeat(3, 38px);
+      gap: 3px;
+      right: 8px;
+      bottom: 8px;
+      padding: 7px;
+    }
+
+    .dpad button {
+      width: 38px;
+      height: 38px;
+    }
+  }
+</style>
+<div id="copro-app">
+  <div id="copro-stage">
+    <canvas id="copro-canvas" width="700" height="700"></canvas>
+    <div id="copro-overlay-top">
+      <div id="copro-hud">
+        <span>Score <strong id="score">0</strong></span>
+        <span>Best <strong id="best">0</strong></span>
+        <span>Lvl <strong id="level">1</strong></span>
+      </div>
+      <div id="copro-controls">
+        <button id="btn-start" title="Start (Space)">Start</button>
+        <button id="btn-pause" title="Pause (Space)">Pause</button>
+        <button id="btn-restart" style="display:none" title="Restart">Reset</button>
+      </div>
+    </div>
+    <div id="copro-msg" aria-live="polite">Press Space, Tap Canvas, or Use D-Pad</div>
+    <div class="dpad" aria-label="Direction controls">
+      <div class="blank"></div>
+      <button data-dir="U" aria-label="Up">▲</button>
+      <div class="blank"></div>
+      <button data-dir="L" aria-label="Left">◀</button>
+      <div class="blank"></div>
+      <button data-dir="R" aria-label="Right">▶</button>
+      <div class="blank"></div>
+      <button data-dir="D" aria-label="Down">▼</button>
+      <div class="blank"></div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  const IS_COMPACT = window.matchMedia("(max-width: 820px)").matches;
+  const COLS = IS_COMPACT ? 18 : 20;
+  const ROWS = COLS;
+  const CELL = IS_COMPACT ? 34 : 32;
+  const START_SPEED = 250;
+  const SPEED_FACTOR = 12;
+  const MIN_SPEED = 70;
+
+  const canvas = document.getElementById("copro-canvas");
+  const ctx = canvas.getContext("2d");
+  const msg = document.getElementById("copro-msg");
+  const btnStart = document.getElementById("btn-start");
+  const btnPause = document.getElementById("btn-pause");
+  const btnRestart = document.getElementById("btn-restart");
+  canvas.width = COLS * CELL;
+  canvas.height = ROWS * CELL;
+
+  const PALETTE = {
+    bg: "#1f1208",
+    grid: "#2e1b0f",
+    body: ["#8b6914", "#9a7520", "#a8842b", "#7a5c10", "#8d6b18"],
+    head: "#c4a040",
+    eye: "#f0e8c0",
+    pupil: "#1e1108",
+    food: ["#8b3a0f", "#6b4c12", "#5a3d08", "#7a2d07"],
+    foodShine: "#f0d890",
+    soilDark: "#261508",
+    segOutline: "#5a3d08",
+    text: "#f2d8a4",
+    textDim: "#c9a06a",
+    death: "#f05f43",
+  };
+
+  let snake;
+  let dir;
+  let nextDir;
+  let food;
+  let score;
+  let best = 0;
+  let level;
+  let speed;
+  let gameState;
+  let intervalId;
+  let frame;
+  let particles;
+
+  const DIRS = {
+    U: { x: 0, y: -1 },
+    D: { x: 0, y: 1 },
+    L: { x: -1, y: 0 },
+    R: { x: 1, y: 0 },
+  };
+
+  function setMessage(text) {
+    msg.textContent = text;
+  }
+
+  function init() {
+    snake = makeInitialSnake();
+    dir = { x: 1, y: 0 };
+    nextDir = { x: 1, y: 0 };
+    food = spawnFood();
+    score = 0;
+    level = 1;
+    speed = START_SPEED;
+    gameState = "idle";
+    frame = 0;
+    particles = [];
+    updateHUD();
+    syncControls();
+    drawIdle();
+  }
+
+  function spawnFood() {
+    let pos;
+    do {
+      pos = {
+        x: Math.floor(Math.random() * COLS),
+        y: Math.floor(Math.random() * ROWS),
+      };
+    } while (snake.some((s) => s.x === pos.x && s.y === pos.y));
+    pos.type = Math.floor(Math.random() * PALETTE.food.length);
+    return pos;
+  }
+
+  function updateHUD() {
+    document.getElementById("score").textContent = score;
+    document.getElementById("best").textContent = best;
+    document.getElementById("level").textContent = level;
+  }
+
+  function syncControls() {
+    btnRestart.style.display = gameState === "idle" ? "none" : "inline-flex";
+    btnPause.textContent = gameState === "paused" ? "Resume" : "Pause";
+    btnStart.textContent = "Start";
+    btnStart.disabled = gameState === "running";
+  }
+
+  function speedForLevel(lvl) {
+    return Math.max(MIN_SPEED, START_SPEED - (lvl - 1) * SPEED_FACTOR);
+  }
+
+  function resetGame() {
+    clearInterval(intervalId);
+    snake = makeInitialSnake();
+    dir = { x: 1, y: 0 };
+    nextDir = { x: 1, y: 0 };
+    food = spawnFood();
+    score = 0;
+    level = 1;
+    speed = START_SPEED;
+    frame = 0;
+    particles = [];
+    updateHUD();
+  }
+
+  function startGame() {
+    if (gameState === "running") return;
+    if (gameState === "idle" || gameState === "dead") resetGame();
+    gameState = "running";
+    setMessage("Eat the dung.");
+    syncControls();
+    clearInterval(intervalId);
+    intervalId = setInterval(tick, speed);
+  }
+
+  function makeInitialSnake() {
+    const midX = Math.floor(COLS / 2);
+    const midY = Math.floor(ROWS / 2);
+    return [
+      { x: midX, y: midY },
+      { x: midX - 1, y: midY },
+      { x: midX - 2, y: midY },
+    ];
+  }
+
+  function pauseGame() {
+    if (gameState === "running") {
+      clearInterval(intervalId);
+      gameState = "paused";
+      setMessage("Paused");
+      syncControls();
+      draw();
+    } else if (gameState === "paused") {
+      gameState = "running";
+      setMessage("Eat the dung.");
+      syncControls();
+      intervalId = setInterval(tick, speed);
+    }
+  }
+
+  function turnTo(next) {
+    if (next.x !== -dir.x || next.y !== -dir.y) {
+      nextDir = next;
+    }
+    if (gameState === "idle" || gameState === "dead") {
+      startGame();
+    }
+  }
+
+  function tick() {
+    frame++;
+    dir = { ...nextDir };
+    const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+    const hitSelf = snake.slice(1).some((s) => s.x === head.x && s.y === head.y);
+    const hitWall = head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS;
+
+    if (hitWall || hitSelf) {
+      die();
+      return;
+    }
+
+    snake.unshift(head);
+    if (head.x === food.x && head.y === food.y) {
+      score += 10 * level;
+      if (score > best) best = score;
+      spawnParticles(food.x, food.y);
+      food = spawnFood();
+
+      if (score % (50 * level) === 0 && level < 12) {
+        level++;
+        clearInterval(intervalId);
+        speed = speedForLevel(level);
+        intervalId = setInterval(tick, speed);
+        setMessage("Level " + level + " (" + speed + "ms)");
+      } else {
+        setMessage("Fresh dung.");
+        setTimeout(function () {
+          if (gameState === "running") setMessage("Eat the dung.");
+        }, 550);
+      }
+      updateHUD();
+    } else {
+      snake.pop();
+    }
+
+    updateParticles();
+    draw();
+  }
+
+  function die() {
+    gameState = "dead";
+    clearInterval(intervalId);
+    if (score > best) best = score;
+    updateHUD();
+    syncControls();
+    setMessage("You died. Score " + score);
+    draw();
+    drawDeathOverlay();
+  }
+
+  function spawnParticles(gx, gy) {
+    for (let i = 0; i < 9; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const spd = 1 + Math.random() * 2.4;
+      particles.push({
+        x: gx * CELL + CELL / 2,
+        y: gy * CELL + CELL / 2,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        life: 16,
+        maxLife: 16,
+        color: PALETTE.food[Math.floor(Math.random() * PALETTE.food.length)],
+      });
+    }
+  }
+
+  function updateParticles() {
+    for (const p of particles) {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.1;
+      p.life--;
+    }
+    particles = particles.filter((p) => p.life > 0);
+  }
+
+  function drawGrid() {
+    const w = canvas.width;
+    const h = canvas.height;
+    const glow = ctx.createRadialGradient(w * 0.5, h * 0.38, 50, w * 0.5, h * 0.4, w * 0.72);
+    glow.addColorStop(0, "#382313");
+    glow.addColorStop(0.5, PALETTE.bg);
+    glow.addColorStop(1, "#160d05");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = PALETTE.grid;
+    ctx.lineWidth = 0.5;
+    for (let x = 0; x <= COLS; x++) {
+      ctx.beginPath();
+      ctx.moveTo(x * CELL, 0);
+      ctx.lineTo(x * CELL, ROWS * CELL);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= ROWS; y++) {
+      ctx.beginPath();
+      ctx.moveTo(0, y * CELL);
+      ctx.lineTo(COLS * CELL, y * CELL);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = PALETTE.soilDark;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, COLS * CELL - 2, ROWS * CELL - 2);
+  }
+
+  function drawFood() {
+    const cx = food.x * CELL + CELL / 2;
+    const cy = food.y * CELL + CELL / 2;
+    const r = CELL * 0.4;
+    ctx.save();
+    const bob = Math.sin(frame * 0.18) * 1.3;
+    ctx.translate(0, bob);
+    ctx.fillStyle = PALETTE.food[food.type];
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = PALETTE.segOutline;
+    ctx.lineWidth = 0.9;
+    ctx.stroke();
+    ctx.fillStyle = PALETTE.foodShine;
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+    ctx.ellipse(cx - r * 0.26, cy - r * 0.3, r * 0.22, r * 0.14, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.font = "bold " + Math.floor(CELL * 0.62) + "px serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(20,10,5,0.7)";
+    ctx.shadowBlur = 2;
+    ctx.shadowOffsetY = 1;
+    ctx.fillText("💩", cx, cy + 0.5);
+    ctx.shadowColor = "transparent";
+    ctx.restore();
+  }
+
+  function drawSnake() {
+    const len = snake.length;
+    for (let i = len - 1; i >= 1; i--) {
+      const s = snake[i];
+      const prev = snake[i - 1];
+      const ci = i % PALETTE.body.length;
+      const px = s.x * CELL;
+      const py = s.y * CELL;
+      ctx.fillStyle = PALETTE.body[ci];
+      const isEnd = i === len - 1;
+      const segR = isEnd ? CELL * 0.28 : CELL * 0.37;
+      const cx2 = px + CELL / 2;
+      const cy2 = py + CELL / 2;
+      ctx.beginPath();
+      ctx.ellipse(cx2, cy2, segR, segR * (isEnd ? 0.72 : 0.88), 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = PALETTE.segOutline;
+      ctx.lineWidth = 0.7;
+      ctx.stroke();
+      if (!isEnd) {
+        const ncx = prev.x * CELL + CELL / 2;
+        const ncy = prev.y * CELL + CELL / 2;
+        ctx.beginPath();
+        ctx.moveTo(cx2, cy2);
+        ctx.lineTo((cx2 + ncx) / 2, (cy2 + ncy) / 2);
+        ctx.lineWidth = segR * 1.6;
+        ctx.strokeStyle = PALETTE.body[ci];
+        ctx.stroke();
+      }
+    }
+
+    const h = snake[0];
+    const hx = h.x * CELL + CELL / 2;
+    const hy = h.y * CELL + CELL / 2;
+    const hr = CELL * 0.44;
+    const angle = Math.atan2(dir.y, dir.x);
+    ctx.fillStyle = PALETTE.head;
+    ctx.beginPath();
+    ctx.ellipse(hx, hy, hr, hr * 0.84, angle, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#4a2e05";
+    ctx.lineWidth = 0.9;
+    ctx.stroke();
+    const ex1x = hx + Math.cos(angle + 0.5) * hr * 0.55;
+    const ex1y = hy + Math.sin(angle + 0.5) * hr * 0.55;
+    const ex2x = hx + Math.cos(angle - 0.5) * hr * 0.55;
+    const ex2y = hy + Math.sin(angle - 0.5) * hr * 0.55;
+    ctx.fillStyle = PALETTE.eye;
+    ctx.beginPath();
+    ctx.arc(ex1x, ex1y, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(ex2x, ex2y, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = PALETTE.pupil;
+    ctx.beginPath();
+    ctx.arc(ex1x + Math.cos(angle) * 0.8, ex1y + Math.sin(angle) * 0.8, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(ex2x + Math.cos(angle) * 0.8, ex2y + Math.sin(angle) * 0.8, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    if (frame % 20 < 10) {
+      const tx = hx + Math.cos(angle) * hr * 0.9;
+      const ty = hy + Math.sin(angle) * hr * 0.9;
+      ctx.strokeStyle = "#d44020";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(tx + Math.cos(angle + 0.35) * 5, ty + Math.sin(angle + 0.35) * 5);
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(tx + Math.cos(angle - 0.35) * 5, ty + Math.sin(angle - 0.35) * 5);
+      ctx.stroke();
+    }
+  }
+
+  function drawParticles() {
+    for (const p of particles) {
+      ctx.globalAlpha = p.life / p.maxLife;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawDeathOverlay() {
+    ctx.fillStyle = "rgba(80,10,0,0.6)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = PALETTE.death;
+    ctx.font = "bold 48px Trebuchet MS, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("DEAD", canvas.width / 2, canvas.height / 2 - 24);
+    ctx.fillStyle = PALETTE.textDim;
+    ctx.font = "bold 20px Consolas, monospace";
+    ctx.fillText("Score " + score, canvas.width / 2, canvas.height / 2 + 26);
+  }
+
+  function drawIdle() {
+    drawGrid();
+    ctx.fillStyle = "rgba(30,17,8,0.72)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = PALETTE.text;
+    ctx.font = "bold 62px Trebuchet MS, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("COPROPHAGE", canvas.width / 2, canvas.height / 2 - 40);
+    ctx.fillStyle = PALETTE.textDim;
+    ctx.font = "bold 24px Consolas, monospace";
+    ctx.fillText("larva mode engaged", canvas.width / 2, canvas.height / 2 + 8);
+    ctx.fillText("space, tap, or d-pad", canvas.width / 2, canvas.height / 2 + 44);
+  }
+
+  function drawPauseOverlay() {
+    ctx.fillStyle = "rgba(30,17,8,0.6)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = PALETTE.text;
+    ctx.font = "bold 42px Trebuchet MS, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("PAUSED", canvas.width / 2, canvas.height / 2);
+  }
+
+  function draw() {
+    drawGrid();
+    drawFood();
+    drawSnake();
+    drawParticles();
+    if (gameState === "paused") drawPauseOverlay();
+  }
+
+  btnStart.addEventListener("click", startGame);
+  btnPause.addEventListener("click", pauseGame);
+  btnRestart.addEventListener("click", function () {
+    resetGame();
+    startGame();
+  });
+
+  document.querySelectorAll(".dpad button[data-dir]").forEach(function (btn) {
+    const press = function (event) {
+      event.preventDefault();
+      btn.classList.add("is-active");
+      const d = DIRS[btn.dataset.dir];
+      turnTo(d);
+      setTimeout(function () {
+        btn.classList.remove("is-active");
+      }, 90);
+    };
+    btn.addEventListener("click", press);
+    btn.addEventListener("touchstart", press, { passive: false });
+  });
+
+  let pointerStart = null;
+  canvas.addEventListener("pointerdown", function (event) {
+    pointerStart = { x: event.clientX, y: event.clientY };
+    if (gameState === "idle" || gameState === "dead") {
+      startGame();
+    }
+  });
+  canvas.addEventListener("pointerup", function (event) {
+    if (!pointerStart) return;
+    const dx = event.clientX - pointerStart.x;
+    const dy = event.clientY - pointerStart.y;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    if (Math.max(absX, absY) > 18) {
+      if (absX > absY) turnTo(dx > 0 ? DIRS.R : DIRS.L);
+      else turnTo(dy > 0 ? DIRS.D : DIRS.U);
+    }
+    pointerStart = null;
+  });
+  canvas.addEventListener("pointercancel", function () {
+    pointerStart = null;
+  });
+
+  document.addEventListener("keydown", function (e) {
+    const map = {
+      ArrowUp: "U",
+      ArrowDown: "D",
+      ArrowLeft: "L",
+      ArrowRight: "R",
+      w: "U",
+      s: "D",
+      a: "L",
+      d: "R",
+    };
+    if (map[e.key]) {
+      e.preventDefault();
+      turnTo(DIRS[map[e.key]]);
+    }
+    if (e.code === "Space") {
+      e.preventDefault();
+      if (gameState === "idle" || gameState === "dead") startGame();
+      else pauseGame();
+    }
+  });
+
+  init();
+})();
+</script>
