@@ -449,7 +449,7 @@
       audioMaster.connect(audioCtx.destination);
 
       musicBus = audioCtx.createGain();
-      musicBus.gain.value = 0.42;
+      musicBus.gain.value = 0.62;
       musicBus.connect(audioMaster);
 
       const sampleLen = Math.floor(audioCtx.sampleRate * 0.4);
