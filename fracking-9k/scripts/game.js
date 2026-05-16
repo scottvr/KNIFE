@@ -384,7 +384,47 @@
     }
   }
 
+  function bindDocumentStartCaptureFallback() {
+    if (!isMobile) return;
+    const titleScreen = document.getElementById('title-screen');
+    const gameoverScreen = document.getElementById('gameover-screen');
+    const fullscreenTitle = document.getElementById('fullscreen-btn');
+    const fullscreenGameover = document.getElementById('fullscreen-btn-gameover');
+    if (!titleScreen || !gameoverScreen) return;
+
+    const isWithin = (target, root) => {
+      if (!target || !root) return false;
+      let node = target;
+      while (node) {
+        if (node === root) return true;
+        node = node.parentElement;
+      }
+      return false;
+    };
+
+    const isWithinAny = (target, roots) => {
+      for (const root of roots) {
+        if (isWithin(target, root)) return true;
+      }
+      return false;
+    };
+
+    const onCaptureTap = (e) => {
+      if (bootBlocked) return;
+      const inTitle = state === 'title' && !titleScreen.classList.contains('hidden');
+      const inGameover = state === 'gameover' && !gameoverScreen.classList.contains('hidden');
+      if (!inTitle && !inGameover) return;
+      const target = e ? e.target : null;
+      if (isWithinAny(target, [fullscreenTitle, fullscreenGameover])) return;
+      startGame();
+    };
+
+    document.addEventListener('touchstart', onCaptureTap, { capture: true, passive: true });
+    document.addEventListener('click', onCaptureTap, { capture: true });
+  }
+
   function bindFullscreenButtons() {
+    if (!canToggleFullscreen()) return;
     const buttonIds = ['fullscreen-btn', 'fullscreen-btn-gameover'];
     for (const id of buttonIds) {
       const btn = document.getElementById(id);
@@ -417,10 +457,6 @@
       pendingFullscreenQueryAction = 'none';
     }
     return ok;
-  }
-
-  if (!canToggleFullscreen()) {
-    noteBootWarning('Fullscreen API unavailable in this browser; use browser-level fullscreen if available.');
   }
 
   const onFullscreenChange = () => {
@@ -2182,7 +2218,10 @@
   // GAME FLOW
   // ============================================================
   function startGame() {
-    if (bootBlocked) return;
+    if (bootBlocked) {
+      console.warn('[Start blocked] Critical boot issues prevent gameplay startup.', bootIssues.critical);
+      return;
+    }
     // Keep URL fullscreen launch behavior first-class on desktop/tablet.
     // On iPhone-class touch browsers, avoid coupling start flow to fullscreen
     // request timing because Safari may reject or stall those transitions.
@@ -2309,6 +2348,17 @@
   bindTapAction(document.getElementById('start-btn'), startGame);
   bindTapAction(document.getElementById('restart-btn'), startGame);
   if (isMobile) bindOverlayStartFallback();
+  bindDocumentStartCaptureFallback();
+
+  window.frackingDebug = Object.assign(window.frackingDebug || {}, {
+    startGame,
+    getState: () => state,
+    isBootBlocked: () => bootBlocked,
+    getBootIssues: () => ({
+      warnings: bootIssues.warnings.slice(),
+      critical: bootIssues.critical.slice()
+    })
+  });
 
   // ============================================================
   // HUD
