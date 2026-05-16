@@ -518,6 +518,7 @@
     const cx = food.x * CELL + CELL / 2;
     const cy = food.y * CELL + CELL / 2;
     const r = CELL * 0.4;
+    const iconScale = IS_COMPACT ? 0.82 : 0.7;
     ctx.save();
     const bob = Math.sin(frame * 0.18) * 1.3;
     ctx.translate(0, bob);
@@ -534,7 +535,14 @@
     ctx.ellipse(cx - r * 0.26, cy - r * 0.3, r * 0.22, r * 0.14, -0.3, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
-    ctx.font = "bold " + Math.floor(CELL * 0.62) + "px serif";
+    ctx.fillStyle = "rgba(246, 232, 196, 0.95)";
+    ctx.beginPath();
+    ctx.arc(cx, cy + 0.2, r * 0.68, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(90, 61, 8, 0.45)";
+    ctx.lineWidth = 0.7;
+    ctx.stroke();
+    ctx.font = "bold " + Math.floor(CELL * iconScale) + "px serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.shadowColor = "rgba(20,10,5,0.7)";
