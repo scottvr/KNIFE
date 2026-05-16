@@ -128,21 +128,26 @@
 
   #copro-msg {
     position: absolute;
-    z-index: 4;
-    left: 12px;
-    bottom: 12px;
-    transform: none;
-    max-width: calc(100% - 160px);
-    text-align: left;
+    z-index: 7;
+    left: 50%;
+    top: 10px;
+    transform: translateX(-50%);
+    width: min(50%, 440px);
+    text-align: center;
     color: var(--copro-ink);
-    background: rgba(20, 10, 5, 0.7);
-    border: 1px solid rgba(255, 232, 193, 0.23);
+    background: rgba(20, 10, 5, 0.8);
+    border: 1px solid rgba(255, 232, 193, 0.28);
     border-radius: 999px;
-    padding: 8px 16px;
-    font-size: 15px;
+    padding: 10px 18px;
+    font: 800 22px/1.05 "Trebuchet MS", "Segoe UI", sans-serif;
     line-height: 1.1;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
     backdrop-filter: blur(3px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   #copro-toasts {
@@ -257,13 +262,13 @@
     }
 
     #copro-msg {
-      left: 10px;
-      transform: none;
-      max-width: calc(100% - 148px);
-      text-align: left;
-      bottom: 8px;
-      font-size: 13px;
-      padding: 7px 10px;
+      left: 50%;
+      top: 8px;
+      width: min(52%, 280px);
+      transform: translateX(-50%);
+      text-align: center;
+      font-size: 18px;
+      padding: 8px 12px;
     }
 
     #copro-toasts {
@@ -308,7 +313,7 @@
         <button id="btn-restart" style="display:none" title="Restart">Reset</button>
       </div>
     </div>
-    <div id="copro-msg" aria-live="polite">Press Space, Tap Canvas, or Use D-Pad</div>
+    <div id="copro-msg" aria-live="polite">Press Space to Begin</div>
     <div id="copro-toasts" aria-live="polite" aria-atomic="false"></div>
     <div class="dpad" aria-label="Direction controls">
       <div class="blank"></div>
@@ -384,6 +389,12 @@
   let intervalId;
   let frame;
   let particles;
+  let audioCtx = null;
+  let audioMaster = null;
+  let noiseBuffer = null;
+  let musicBus = null;
+  let musicTimer = null;
+  let musicStep = 0;
 
   const DIRS = {
     U: { x: 0, y: -1 },
@@ -401,8 +412,224 @@
     "Compost candy."
   ];
 
+  const BITE_MESSAGES = [
+    "Yum Yum!",
+    "Delicioso!",
+    "Prime Dung!",
+    "Chef's Kiss!",
+    "So Fresh!",
+    "Glorious Morsel!",
+    "Compost Deluxe!"
+  ];
+
+  const LEVEL_MESSAGES = [
+    "Metabolism Up!",
+    "Scavenger Supreme!",
+    "Larva Ascendant!",
+    "Speed Unlocked!"
+  ];
+
+  const MUSIC_STEP_MS = 148;
+  const MUSIC_SCALE = [0, 3, 5, 7, 10];
+  const MUSIC_ROOTS = [36, 36, 38, 38, 41, 41, 43, 43];
+  const LEAD_PATTERN = [0, null, 2, null, 4, null, 2, 1, 0, null, 3, null, 4, null, 2, 1];
+  const LEAD_SWING = [0, 2, 4, 2, 1, 2, 3, 2];
+
   function setMessage(text) {
     msg.textContent = text;
+  }
+
+  function ensureAudio() {
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtor) return false;
+    if (!audioCtx) {
+      audioCtx = new AudioCtor();
+      audioMaster = audioCtx.createGain();
+      audioMaster.gain.value = 0.26;
+      audioMaster.connect(audioCtx.destination);
+
+      musicBus = audioCtx.createGain();
+      musicBus.gain.value = 0.42;
+      musicBus.connect(audioMaster);
+
+      const sampleLen = Math.floor(audioCtx.sampleRate * 0.4);
+      noiseBuffer = audioCtx.createBuffer(1, sampleLen, audioCtx.sampleRate);
+      const noiseData = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < sampleLen; i++) {
+        noiseData[i] = (Math.random() * 2 - 1) * 0.9;
+      }
+    }
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+    return true;
+  }
+
+  function routeNode(node, volume, start, attack, release) {
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume), start + attack);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + attack + release);
+    node.connect(gain);
+    gain.connect(audioMaster);
+    return gain;
+  }
+
+  function playSfxBite() {
+    if (!ensureAudio()) return;
+    const t = audioCtx.currentTime;
+
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    const band = audioCtx.createBiquadFilter();
+    band.type = "bandpass";
+    band.Q.value = 1.3;
+    band.frequency.setValueAtTime(420, t);
+    band.frequency.exponentialRampToValueAtTime(210, t + 0.09);
+    noise.connect(band);
+    routeNode(band, 0.12, t, 0.01, 0.11);
+    noise.start(t);
+    noise.stop(t + 0.14);
+
+    const plop = audioCtx.createOscillator();
+    plop.type = "sine";
+    plop.frequency.setValueAtTime(150, t);
+    plop.frequency.exponentialRampToValueAtTime(78, t + 0.09);
+    routeNode(plop, 0.09, t, 0.004, 0.1);
+    plop.start(t);
+    plop.stop(t + 0.13);
+  }
+
+  function playSfxLevel() {
+    if (!ensureAudio()) return;
+    const t = audioCtx.currentTime;
+    [0, 0.06, 0.12].forEach(function (offset, i) {
+      const osc = audioCtx.createOscillator();
+      osc.type = "triangle";
+      const freq = i === 0 ? 280 : i === 1 ? 360 : 450;
+      osc.frequency.setValueAtTime(freq, t + offset);
+      routeNode(osc, 0.08, t + offset, 0.004, 0.12);
+      osc.start(t + offset);
+      osc.stop(t + offset + 0.16);
+    });
+  }
+
+  function playSfxDeath() {
+    if (!ensureAudio()) return;
+    const t = audioCtx.currentTime;
+
+    const osc = audioCtx.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(170, t);
+    osc.frequency.exponentialRampToValueAtTime(44, t + 0.32);
+    routeNode(osc, 0.1, t, 0.01, 0.34);
+    osc.start(t);
+    osc.stop(t + 0.36);
+
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    const low = audioCtx.createBiquadFilter();
+    low.type = "lowpass";
+    low.frequency.setValueAtTime(700, t);
+    low.frequency.exponentialRampToValueAtTime(180, t + 0.28);
+    noise.connect(low);
+    routeNode(low, 0.08, t, 0.01, 0.26);
+    noise.start(t);
+    noise.stop(t + 0.28);
+  }
+
+  function playSfxUi(kind) {
+    if (!ensureAudio()) return;
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    osc.type = "square";
+    const f1 = kind === "pause" ? 190 : 240;
+    const f2 = kind === "pause" ? 150 : 310;
+    osc.frequency.setValueAtTime(f1, t);
+    osc.frequency.exponentialRampToValueAtTime(f2, t + 0.06);
+    routeNode(osc, 0.045, t, 0.003, 0.08);
+    osc.start(t);
+    osc.stop(t + 0.1);
+  }
+
+  function midiToFreq(midi) {
+    return 440 * Math.pow(2, (midi - 69) / 12);
+  }
+
+  function playMusicVoice(freq, duration, volume, isBass) {
+    if (!ensureAudio()) return;
+    const t = audioCtx.currentTime;
+
+    const carrier = audioCtx.createOscillator();
+    carrier.type = isBass ? "sawtooth" : "square";
+    carrier.frequency.setValueAtTime(freq, t);
+
+    const mod = audioCtx.createOscillator();
+    mod.type = "sine";
+    mod.frequency.setValueAtTime(isBass ? 26 : 44, t);
+    const modGain = audioCtx.createGain();
+    modGain.gain.setValueAtTime(freq * (isBass ? 0.22 : 0.12), t);
+    modGain.gain.exponentialRampToValueAtTime(freq * (isBass ? 0.11 : 0.05), t + duration * 0.9);
+    mod.connect(modGain);
+    modGain.connect(carrier.frequency);
+
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.Q.value = isBass ? 1.8 : 2.2;
+    filter.frequency.setValueAtTime(isBass ? 250 : 420, t);
+    filter.frequency.exponentialRampToValueAtTime(isBass ? 140 : 260, t + duration);
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume), t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+
+    carrier.connect(filter);
+    filter.connect(gain);
+    gain.connect(musicBus);
+
+    carrier.start(t);
+    mod.start(t);
+    carrier.stop(t + duration + 0.04);
+    mod.stop(t + duration + 0.04);
+  }
+
+  function musicTick() {
+    if (gameState !== "running") return;
+
+    const step16 = musicStep % 16;
+    const root = MUSIC_ROOTS[Math.floor(musicStep / 8) % MUSIC_ROOTS.length];
+    const groove = LEAD_SWING[musicStep % LEAD_SWING.length];
+    const leadDegree = LEAD_PATTERN[step16];
+    const bassHit = step16 % 4 === 0;
+    const accent = step16 % 8 === 0;
+
+    if (bassHit) {
+      playMusicVoice(midiToFreq(root - 12), 0.24, accent ? 0.065 : 0.052, true);
+    }
+
+    if (leadDegree !== null) {
+      const leadMidi = root + 12 + MUSIC_SCALE[(leadDegree + groove) % MUSIC_SCALE.length];
+      playMusicVoice(midiToFreq(leadMidi), 0.16, accent ? 0.048 : 0.036, false);
+    }
+
+    musicStep++;
+  }
+
+  function startMusic() {
+    if (!ensureAudio()) return;
+    if (musicTimer) return;
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+    musicTick();
+    musicTimer = setInterval(musicTick, MUSIC_STEP_MS);
+  }
+
+  function stopMusic() {
+    if (!musicTimer) return;
+    clearInterval(musicTimer);
+    musicTimer = null;
   }
 
   function pickRandom(items) {
@@ -423,6 +650,7 @@
   }
 
   function init() {
+    stopMusic();
     snake = makeInitialSnake();
     dir = { x: 1, y: 0 };
     nextDir = { x: 1, y: 0 };
@@ -435,6 +663,7 @@
     particles = [];
     updateHUD();
     syncControls();
+    setMessage("Press Space to Begin");
     drawIdle();
   }
 
@@ -469,6 +698,8 @@
 
   function resetGame() {
     clearInterval(intervalId);
+    stopMusic();
+    musicStep = 0;
     snake = makeInitialSnake();
     dir = { x: 1, y: 0 };
     nextDir = { x: 1, y: 0 };
@@ -483,9 +714,12 @@
 
   function startGame() {
     if (gameState === "running") return;
+    ensureAudio();
     if (gameState === "idle" || gameState === "dead") resetGame();
     gameState = "running";
     setMessage("Eat the dung.");
+    playSfxUi("start");
+    startMusic();
     syncControls();
     clearInterval(intervalId);
     intervalId = setInterval(tick, speed);
@@ -504,13 +738,17 @@
   function pauseGame() {
     if (gameState === "running") {
       clearInterval(intervalId);
+      stopMusic();
       gameState = "paused";
       setMessage("Paused");
+      playSfxUi("pause");
       syncControls();
       draw();
     } else if (gameState === "paused") {
       gameState = "running";
       setMessage("Eat the dung.");
+      playSfxUi("start");
+      startMusic();
       syncControls();
       intervalId = setInterval(tick, speed);
     }
@@ -543,6 +781,7 @@
       if (score > best) best = score;
       spawnParticles(food.x, food.y);
       food = spawnFood();
+      playSfxBite();
       pushToast(pickRandom(BITE_TOASTS));
 
       if (score % (50 * level) === 0 && level < 12) {
@@ -550,13 +789,14 @@
         clearInterval(intervalId);
         speed = speedForLevel(level);
         intervalId = setInterval(tick, speed);
-        setMessage("Level " + level + " (" + speed + "ms)");
+        playSfxLevel();
+        setMessage(pickRandom(LEVEL_MESSAGES) + "  L" + level);
         pushToast("Level " + level + " speed boost.", "level");
       } else {
-        setMessage("Crunch.");
+        setMessage(pickRandom(BITE_MESSAGES));
         setTimeout(function () {
           if (gameState === "running") setMessage("Eat the dung.");
-        }, 550);
+        }, 700);
       }
       updateHUD();
     } else {
@@ -570,6 +810,8 @@
   function die() {
     gameState = "dead";
     clearInterval(intervalId);
+    stopMusic();
+    playSfxDeath();
     if (score > best) best = score;
     updateHUD();
     syncControls();
@@ -847,6 +1089,7 @@
   document.querySelectorAll(".dpad button[data-dir]").forEach(function (btn) {
     const press = function (event) {
       event.preventDefault();
+      ensureAudio();
       btn.classList.add("is-active");
       const d = DIRS[btn.dataset.dir];
       turnTo(d);
@@ -860,6 +1103,7 @@
 
   let pointerStart = null;
   canvas.addEventListener("pointerdown", function (event) {
+    ensureAudio();
     pointerStart = { x: event.clientX, y: event.clientY };
     if (gameState === "idle" || gameState === "dead") {
       startGame();
@@ -882,6 +1126,7 @@
   });
 
   document.addEventListener("keydown", function (e) {
+    ensureAudio();
     const map = {
       ArrowUp: "U",
       ArrowDown: "D",
