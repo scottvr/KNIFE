@@ -315,13 +315,35 @@
     return enterFullscreen();
   }
 
+  function bindTapAction(buttonEl, action) {
+    if (!buttonEl || typeof action !== 'function') return;
+    let lastTouchTriggerMs = -Infinity;
+    const CLICK_SUPPRESS_AFTER_TOUCH_MS = 700;
+    const invoke = (e) => {
+      if (e && typeof e.preventDefault === 'function') e.preventDefault();
+      action();
+    };
+
+    buttonEl.addEventListener('touchstart', (e) => {
+      lastTouchTriggerMs = performance.now();
+      invoke(e);
+    }, { passive: false });
+
+    buttonEl.addEventListener('click', (e) => {
+      if (performance.now() - lastTouchTriggerMs < CLICK_SUPPRESS_AFTER_TOUCH_MS) {
+        if (e && typeof e.preventDefault === 'function') e.preventDefault();
+        return;
+      }
+      invoke(e);
+    });
+  }
+
   function bindFullscreenButtons() {
     const buttonIds = ['fullscreen-btn', 'fullscreen-btn-gameover'];
     for (const id of buttonIds) {
       const btn = document.getElementById(id);
       if (!btn) continue;
-      btn.addEventListener('click', (e) => {
-        if (e && typeof e.preventDefault === 'function') e.preventDefault();
+      bindTapAction(btn, () => {
         void toggleFullscreen();
       });
     }
@@ -2235,10 +2257,8 @@
   renderBootIssues();
   bindFullscreenButtons();
   updateFullscreenUi();
-  document.getElementById('start-btn').addEventListener('click', startGame);
-  document.getElementById('start-btn').addEventListener('touchend', (e) => { e.preventDefault(); startGame(); });
-  document.getElementById('restart-btn').addEventListener('click', startGame);
-  document.getElementById('restart-btn').addEventListener('touchend', (e) => { e.preventDefault(); startGame(); });
+  bindTapAction(document.getElementById('start-btn'), startGame);
+  bindTapAction(document.getElementById('restart-btn'), startGame);
 
   // ============================================================
   // HUD
