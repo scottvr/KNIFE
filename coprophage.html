@@ -85,8 +85,8 @@
     background: var(--copro-panel);
     border: 1px solid var(--copro-line);
     border-radius: 999px;
-    padding: 4px 10px;
-    font: 700 12px/1 "Consolas", "Courier New", monospace;
+    padding: 7px 12px;
+    font: 800 14px/1 "Consolas", "Courier New", monospace;
     color: var(--copro-muted);
     letter-spacing: 0.02em;
     text-transform: uppercase;
@@ -109,8 +109,8 @@
     color: var(--copro-ink);
     background: var(--copro-panel);
     border-radius: 8px;
-    padding: 4px 10px;
-    font: 700 11px/1 "Consolas", "Courier New", monospace;
+    padding: 7px 11px;
+    font: 700 12px/1 "Consolas", "Courier New", monospace;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     cursor: pointer;
@@ -129,20 +129,64 @@
   #copro-msg {
     position: absolute;
     z-index: 4;
-    left: 50%;
+    left: 12px;
     bottom: 12px;
-    transform: translateX(-50%);
-    max-width: calc(100% - 150px);
-    text-align: center;
+    transform: none;
+    max-width: calc(100% - 160px);
+    text-align: left;
     color: var(--copro-ink);
     background: rgba(20, 10, 5, 0.7);
     border: 1px solid rgba(255, 232, 193, 0.23);
     border-radius: 999px;
-    padding: 6px 14px;
-    font-size: 13px;
+    padding: 8px 16px;
+    font-size: 15px;
     line-height: 1.1;
     letter-spacing: 0.02em;
     backdrop-filter: blur(3px);
+  }
+
+  #copro-toasts {
+    position: absolute;
+    z-index: 6;
+    top: 58px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    max-width: min(44vw, 260px);
+    pointer-events: none;
+  }
+
+  .copro-toast {
+    background: rgba(20, 10, 5, 0.82);
+    border: 1px solid rgba(255, 232, 193, 0.3);
+    color: var(--copro-ink);
+    border-radius: 10px;
+    padding: 7px 10px;
+    font: 700 13px/1.15 "Consolas", "Courier New", monospace;
+    letter-spacing: 0.01em;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+    transform-origin: top right;
+    animation: copro-toast-pop 1.5s ease forwards;
+  }
+
+  .copro-toast.level {
+    color: #ffe4a8;
+    border-color: rgba(255, 206, 100, 0.45);
+  }
+
+  .copro-toast.bad {
+    color: #ffc8bc;
+    border-color: rgba(255, 128, 96, 0.44);
+  }
+
+  @keyframes copro-toast-pop {
+    0% { opacity: 0; transform: translateY(-8px) scale(0.8); }
+    15% { opacity: 1; transform: translateY(0) scale(1.06); }
+    25% { transform: translateY(0) scale(1); }
+    75% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-4px) scale(0.95); }
   }
 
   .dpad {
@@ -196,11 +240,42 @@
       height: calc(100vw - 8px);
     }
 
+    #copro-overlay-top {
+      left: 8px;
+      right: 8px;
+      top: 8px;
+    }
+
+    #copro-hud span {
+      font-size: 13px;
+      padding: 6px 10px;
+    }
+
+    #copro-controls button {
+      font-size: 11px;
+      padding: 6px 9px;
+    }
+
     #copro-msg {
       left: 10px;
       transform: none;
-      max-width: calc(100% - 132px);
+      max-width: calc(100% - 148px);
       text-align: left;
+      bottom: 8px;
+      font-size: 13px;
+      padding: 7px 10px;
+    }
+
+    #copro-toasts {
+      top: 50px;
+      right: 8px;
+      max-width: 56vw;
+      gap: 4px;
+    }
+
+    .copro-toast {
+      font-size: 12px;
+      padding: 6px 8px;
     }
 
     .dpad {
@@ -234,6 +309,7 @@
       </div>
     </div>
     <div id="copro-msg" aria-live="polite">Press Space, Tap Canvas, or Use D-Pad</div>
+    <div id="copro-toasts" aria-live="polite" aria-atomic="false"></div>
     <div class="dpad" aria-label="Direction controls">
       <div class="blank"></div>
       <button data-dir="U" aria-label="Up">▲</button>
@@ -258,6 +334,14 @@
   const COLS = IS_COMPACT ? MOBILE_COLS : DESKTOP_COLS;
   const ROWS = COLS;
   const CELL = IS_COMPACT ? 34 : 32;
+  // UI safe bands: top/bottom rows reserved for HUD + status overlays.
+  const SAFE_TOP_ROWS = IS_COMPACT ? 2 : 2;
+  const SAFE_BOTTOM_ROWS = IS_COMPACT ? 2 : 2;
+  const PLAY_COLS = COLS;
+  const PLAY_ROWS = ROWS - SAFE_TOP_ROWS - SAFE_BOTTOM_ROWS;
+  const PLAY_TOP = SAFE_TOP_ROWS * CELL;
+  const PLAY_HEIGHT = PLAY_ROWS * CELL;
+  const PLAY_BOTTOM = PLAY_TOP + PLAY_HEIGHT;
   const START_SPEED = 250;
   const SPEED_FACTOR = 12;
   const MIN_SPEED = 70;
@@ -265,6 +349,7 @@
   const canvas = document.getElementById("copro-canvas");
   const ctx = canvas.getContext("2d");
   const msg = document.getElementById("copro-msg");
+  const toastHost = document.getElementById("copro-toasts");
   const btnStart = document.getElementById("btn-start");
   const btnPause = document.getElementById("btn-pause");
   const btnRestart = document.getElementById("btn-restart");
@@ -307,8 +392,34 @@
     R: { x: 1, y: 0 },
   };
 
+  const BITE_TOASTS = [
+    "Snack secured.",
+    "Fresh find.",
+    "Prime pile.",
+    "Gobble complete.",
+    "Larva approved.",
+    "Compost candy."
+  ];
+
   function setMessage(text) {
     msg.textContent = text;
+  }
+
+  function pickRandom(items) {
+    return items[Math.floor(Math.random() * items.length)];
+  }
+
+  function pushToast(text, tone) {
+    const toast = document.createElement("div");
+    toast.className = "copro-toast" + (tone ? " " + tone : "");
+    toast.textContent = text;
+    toastHost.appendChild(toast);
+    while (toastHost.children.length > 3) {
+      toastHost.firstElementChild.remove();
+    }
+    setTimeout(function () {
+      toast.remove();
+    }, 1550);
   }
 
   function init() {
@@ -331,8 +442,8 @@
     let pos;
     do {
       pos = {
-        x: Math.floor(Math.random() * COLS),
-        y: Math.floor(Math.random() * ROWS),
+        x: Math.floor(Math.random() * PLAY_COLS),
+        y: Math.floor(Math.random() * PLAY_ROWS),
       };
     } while (snake.some((s) => s.x === pos.x && s.y === pos.y));
     pos.type = Math.floor(Math.random() * PALETTE.food.length);
@@ -381,8 +492,8 @@
   }
 
   function makeInitialSnake() {
-    const midX = Math.floor(COLS / 2);
-    const midY = Math.floor(ROWS / 2);
+    const midX = Math.floor(PLAY_COLS / 2);
+    const midY = Math.floor(PLAY_ROWS / 2);
     return [
       { x: midX, y: midY },
       { x: midX - 1, y: midY },
@@ -419,7 +530,7 @@
     dir = { ...nextDir };
     const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
     const hitSelf = snake.slice(1).some((s) => s.x === head.x && s.y === head.y);
-    const hitWall = head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS;
+    const hitWall = head.x < 0 || head.x >= PLAY_COLS || head.y < 0 || head.y >= PLAY_ROWS;
 
     if (hitWall || hitSelf) {
       die();
@@ -432,6 +543,7 @@
       if (score > best) best = score;
       spawnParticles(food.x, food.y);
       food = spawnFood();
+      pushToast(pickRandom(BITE_TOASTS));
 
       if (score % (50 * level) === 0 && level < 12) {
         level++;
@@ -439,8 +551,9 @@
         speed = speedForLevel(level);
         intervalId = setInterval(tick, speed);
         setMessage("Level " + level + " (" + speed + "ms)");
+        pushToast("Level " + level + " speed boost.", "level");
       } else {
-        setMessage("Fresh dung.");
+        setMessage("Crunch.");
         setTimeout(function () {
           if (gameState === "running") setMessage("Eat the dung.");
         }, 550);
@@ -461,6 +574,7 @@
     updateHUD();
     syncControls();
     setMessage("You died. Score " + score);
+    pushToast("Larva down.", "bad");
     draw();
     drawDeathOverlay();
   }
@@ -471,7 +585,7 @@
       const spd = 1 + Math.random() * 2.4;
       particles.push({
         x: gx * CELL + CELL / 2,
-        y: gy * CELL + CELL / 2,
+        y: PLAY_TOP + gy * CELL + CELL / 2,
         vx: Math.cos(angle) * spd,
         vy: Math.sin(angle) * spd,
         life: 16,
@@ -500,28 +614,38 @@
     glow.addColorStop(1, "#160d05");
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, w, h);
+
+    ctx.fillStyle = "rgba(18, 9, 4, 0.52)";
+    ctx.fillRect(0, 0, w, PLAY_TOP);
+    ctx.fillRect(0, PLAY_BOTTOM, w, h - PLAY_BOTTOM);
+
+    ctx.fillStyle = "rgba(255, 222, 170, 0.06)";
+    ctx.fillRect(0, PLAY_TOP - 1, w, 1);
+    ctx.fillRect(0, PLAY_BOTTOM, w, 1);
+
     ctx.strokeStyle = PALETTE.grid;
     ctx.lineWidth = 0.5;
-    for (let x = 0; x <= COLS; x++) {
+    for (let x = 0; x <= PLAY_COLS; x++) {
       ctx.beginPath();
-      ctx.moveTo(x * CELL, 0);
-      ctx.lineTo(x * CELL, ROWS * CELL);
+      ctx.moveTo(x * CELL, PLAY_TOP);
+      ctx.lineTo(x * CELL, PLAY_BOTTOM);
       ctx.stroke();
     }
-    for (let y = 0; y <= ROWS; y++) {
+    for (let y = 0; y <= PLAY_ROWS; y++) {
       ctx.beginPath();
-      ctx.moveTo(0, y * CELL);
-      ctx.lineTo(COLS * CELL, y * CELL);
+      const rowY = PLAY_TOP + y * CELL;
+      ctx.moveTo(0, rowY);
+      ctx.lineTo(PLAY_COLS * CELL, rowY);
       ctx.stroke();
     }
     ctx.strokeStyle = PALETTE.soilDark;
     ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, COLS * CELL - 2, ROWS * CELL - 2);
+    ctx.strokeRect(1, PLAY_TOP + 1, PLAY_COLS * CELL - 2, PLAY_HEIGHT - 2);
   }
 
   function drawFood() {
     const cx = food.x * CELL + CELL / 2;
-    const cy = food.y * CELL + CELL / 2;
+    const cy = PLAY_TOP + food.y * CELL + CELL / 2;
     const r = CELL * 0.4;
     const iconScale = IS_COMPACT ? 0.82 : 0.7;
     ctx.save();
@@ -565,7 +689,7 @@
       const prev = snake[i - 1];
       const ci = i % PALETTE.body.length;
       const px = s.x * CELL;
-      const py = s.y * CELL;
+      const py = PLAY_TOP + s.y * CELL;
       ctx.fillStyle = PALETTE.body[ci];
       const isEnd = i === len - 1;
       const segR = isEnd ? CELL * 0.28 : CELL * 0.37;
@@ -579,7 +703,7 @@
       ctx.stroke();
       if (!isEnd) {
         const ncx = prev.x * CELL + CELL / 2;
-        const ncy = prev.y * CELL + CELL / 2;
+        const ncy = PLAY_TOP + prev.y * CELL + CELL / 2;
         ctx.beginPath();
         ctx.moveTo(cx2, cy2);
         ctx.lineTo((cx2 + ncx) / 2, (cy2 + ncy) / 2);
@@ -591,7 +715,7 @@
 
     const h = snake[0];
     const hx = h.x * CELL + CELL / 2;
-    const hy = h.y * CELL + CELL / 2;
+    const hy = PLAY_TOP + h.y * CELL + CELL / 2;
     const hr = CELL * 0.44;
     const angle = Math.atan2(dir.y, dir.x);
     ctx.fillStyle = PALETTE.head;
@@ -619,17 +743,37 @@
     ctx.beginPath();
     ctx.arc(ex2x + Math.cos(angle) * 0.8, ex2y + Math.sin(angle) * 0.8, 1.2, 0, Math.PI * 2);
     ctx.fill();
-    if (frame % 20 < 10) {
-      const tx = hx + Math.cos(angle) * hr * 0.9;
-      const ty = hy + Math.sin(angle) * hr * 0.9;
-      ctx.strokeStyle = "#d44020";
-      ctx.lineWidth = 1.2;
+    if (frame % 18 < 9) {
+      const tail = snake[len - 1];
+      const preTail = len > 1 ? snake[len - 2] : null;
+      const tailAngle = preTail
+        ? Math.atan2(tail.y - preTail.y, tail.x - preTail.x)
+        : Math.atan2(-dir.y, -dir.x);
+      const tailX = tail.x * CELL + CELL / 2;
+      const tailY = PLAY_TOP + tail.y * CELL + CELL / 2;
+      const baseX = tailX + Math.cos(tailAngle) * CELL * 0.22;
+      const baseY = tailY + Math.sin(tailAngle) * CELL * 0.22;
+      const plumeLen = CELL * 0.2 + Math.sin(frame * 0.6) * CELL * 0.05;
+
+      ctx.strokeStyle = "#5f3110";
+      ctx.lineWidth = 1.3;
       ctx.beginPath();
-      ctx.moveTo(tx, ty);
-      ctx.lineTo(tx + Math.cos(angle + 0.35) * 5, ty + Math.sin(angle + 0.35) * 5);
-      ctx.moveTo(tx, ty);
-      ctx.lineTo(tx + Math.cos(angle - 0.35) * 5, ty + Math.sin(angle - 0.35) * 5);
+      ctx.moveTo(baseX, baseY);
+      ctx.lineTo(baseX + Math.cos(tailAngle + 0.24) * plumeLen, baseY + Math.sin(tailAngle + 0.24) * plumeLen);
+      ctx.moveTo(baseX, baseY);
+      ctx.lineTo(baseX + Math.cos(tailAngle - 0.24) * plumeLen, baseY + Math.sin(tailAngle - 0.24) * plumeLen);
       ctx.stroke();
+
+      ctx.fillStyle = "#8b3a0f";
+      ctx.beginPath();
+      ctx.arc(
+        baseX + Math.cos(tailAngle) * (plumeLen + 1.5),
+        baseY + Math.sin(tailAngle) * (plumeLen + 1.5),
+        1.6,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
     }
   }
 
@@ -646,40 +790,43 @@
 
   function drawDeathOverlay() {
     ctx.fillStyle = "rgba(80,10,0,0.6)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, PLAY_TOP, canvas.width, PLAY_HEIGHT);
+    const midY = PLAY_TOP + PLAY_HEIGHT / 2;
     ctx.fillStyle = PALETTE.death;
     ctx.font = "bold 48px Trebuchet MS, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("DEAD", canvas.width / 2, canvas.height / 2 - 24);
+    ctx.fillText("DEAD", canvas.width / 2, midY - 24);
     ctx.fillStyle = PALETTE.textDim;
     ctx.font = "bold 20px Consolas, monospace";
-    ctx.fillText("Score " + score, canvas.width / 2, canvas.height / 2 + 26);
+    ctx.fillText("Score " + score, canvas.width / 2, midY + 26);
   }
 
   function drawIdle() {
     drawGrid();
     ctx.fillStyle = "rgba(30,17,8,0.72)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, PLAY_TOP, canvas.width, PLAY_HEIGHT);
+    const midY = PLAY_TOP + PLAY_HEIGHT / 2;
     ctx.fillStyle = PALETTE.text;
     ctx.font = "bold 62px Trebuchet MS, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("COPROPHAGE", canvas.width / 2, canvas.height / 2 - 40);
+    ctx.fillText("COPROPHAGE", canvas.width / 2, midY - 40);
     ctx.fillStyle = PALETTE.textDim;
     ctx.font = "bold 24px Consolas, monospace";
-    ctx.fillText("larva mode engaged", canvas.width / 2, canvas.height / 2 + 8);
-    ctx.fillText("space, tap, or d-pad", canvas.width / 2, canvas.height / 2 + 44);
+    ctx.fillText("larva mode engaged", canvas.width / 2, midY + 8);
+    ctx.fillText("space, tap, or d-pad", canvas.width / 2, midY + 44);
   }
 
   function drawPauseOverlay() {
     ctx.fillStyle = "rgba(30,17,8,0.6)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, PLAY_TOP, canvas.width, PLAY_HEIGHT);
+    const midY = PLAY_TOP + PLAY_HEIGHT / 2;
     ctx.fillStyle = PALETTE.text;
     ctx.font = "bold 42px Trebuchet MS, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("PAUSED", canvas.width / 2, canvas.height / 2);
+    ctx.fillText("PAUSED", canvas.width / 2, midY);
   }
 
   function draw() {
