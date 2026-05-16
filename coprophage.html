@@ -249,8 +249,13 @@
 </div>
 <script>
 (function () {
+  // Quick tuning knobs:
+  // - Lower `MOBILE_COLS` => fewer, larger squares on phones.
+  // - Lower `DESKTOP_COLS` => fewer, larger squares on laptops/desktops.
   const IS_COMPACT = window.matchMedia("(max-width: 820px)").matches;
-  const COLS = IS_COMPACT ? 18 : 20;
+  const MOBILE_COLS = 14;
+  const DESKTOP_COLS = 20;
+  const COLS = IS_COMPACT ? MOBILE_COLS : DESKTOP_COLS;
   const ROWS = COLS;
   const CELL = IS_COMPACT ? 34 : 32;
   const START_SPEED = 250;
