@@ -328,7 +328,6 @@
   }
 
   let pendingFullscreenQueryAction = FULLSCREEN_QUERY_ACTION;
-  let fullscreenQueryRetryBound = false;
 
   async function applyFullscreenQueryAction() {
     const action = pendingFullscreenQueryAction;
@@ -352,19 +351,6 @@
     return ok;
   }
 
-  function bindFullscreenQueryRetryOnGesture() {
-    if (fullscreenQueryRetryBound || pendingFullscreenQueryAction === 'none') return;
-    fullscreenQueryRetryBound = true;
-    const tryOnce = () => {
-      window.removeEventListener('pointerdown', tryOnce);
-      window.removeEventListener('keydown', tryOnce);
-      fullscreenQueryRetryBound = false;
-      void applyFullscreenQueryAction();
-    };
-    window.addEventListener('pointerdown', tryOnce, { passive: true });
-    window.addEventListener('keydown', tryOnce);
-  }
-
   if (!canToggleFullscreen()) {
     noteBootWarning('Fullscreen API unavailable in this browser; use browser-level fullscreen if available.');
   }
@@ -376,8 +362,10 @@
   window.addEventListener('fullscreenchange', onFullscreenChange);
   window.addEventListener('webkitfullscreenchange', onFullscreenChange);
   if (pendingFullscreenQueryAction !== 'none') {
+    // Do an immediate attempt (may fail without user activation). We intentionally
+    // do not hook a global pointer listener because that can steal/cancel the
+    // mobile title-screen tap that should start the game.
     void applyFullscreenQueryAction();
-    bindFullscreenQueryRetryOnGesture();
   }
 
   if (fractalRenderer && typeof fractalRenderer.setCrtBlack === 'function') {
