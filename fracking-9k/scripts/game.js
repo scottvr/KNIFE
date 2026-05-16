@@ -338,6 +338,52 @@
     });
   }
 
+  function bindOverlayStartFallback() {
+    const overlayConfigs = [
+      { id: 'title-screen', fullscreenButtonId: 'fullscreen-btn', state: 'title' },
+      { id: 'gameover-screen', fullscreenButtonId: 'fullscreen-btn-gameover', state: 'gameover' }
+    ];
+    const CLICK_SUPPRESS_AFTER_TOUCH_MS = 700;
+    let lastTouchTriggerMs = -Infinity;
+
+    const isWithin = (target, root) => {
+      if (!target || !root) return false;
+      let node = target;
+      while (node) {
+        if (node === root) return true;
+        node = node.parentElement;
+      }
+      return false;
+    };
+
+    for (const cfg of overlayConfigs) {
+      const overlay = document.getElementById(cfg.id);
+      const fullscreenBtn = document.getElementById(cfg.fullscreenButtonId);
+      if (!overlay) continue;
+
+      const maybeStart = (e) => {
+        if (state !== cfg.state || bootBlocked) return;
+        const target = e ? e.target : null;
+        if (isWithin(target, fullscreenBtn)) return;
+        if (e && typeof e.preventDefault === 'function') e.preventDefault();
+        startGame();
+      };
+
+      overlay.addEventListener('touchstart', (e) => {
+        lastTouchTriggerMs = performance.now();
+        maybeStart(e);
+      }, { passive: false });
+
+      overlay.addEventListener('click', (e) => {
+        if (performance.now() - lastTouchTriggerMs < CLICK_SUPPRESS_AFTER_TOUCH_MS) {
+          if (e && typeof e.preventDefault === 'function') e.preventDefault();
+          return;
+        }
+        maybeStart(e);
+      });
+    }
+  }
+
   function bindFullscreenButtons() {
     const buttonIds = ['fullscreen-btn', 'fullscreen-btn-gameover'];
     for (const id of buttonIds) {
@@ -2137,7 +2183,10 @@
   // ============================================================
   function startGame() {
     if (bootBlocked) return;
-    void applyFullscreenQueryAction();
+    // Keep URL fullscreen launch behavior first-class on desktop/tablet.
+    // On iPhone-class touch browsers, avoid coupling start flow to fullscreen
+    // request timing because Safari may reject or stall those transitions.
+    if (!isMobile) void applyFullscreenQueryAction();
     ensureAudio();
     score = 0;
     lives = 6;
@@ -2259,6 +2308,7 @@
   updateFullscreenUi();
   bindTapAction(document.getElementById('start-btn'), startGame);
   bindTapAction(document.getElementById('restart-btn'), startGame);
+  if (isMobile) bindOverlayStartFallback();
 
   // ============================================================
   // HUD
