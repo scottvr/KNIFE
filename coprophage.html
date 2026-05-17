@@ -360,6 +360,7 @@
   const START_SPEED = 250;
   const SPEED_FACTOR = 12;
   const MIN_SPEED = 70;
+  const BOARD_PATH = buildBoardPath();
 
   const canvas = document.getElementById("copro-canvas");
   const ctx = canvas.getContext("2d");
@@ -408,6 +409,26 @@
   let musicTimer = null;
   let musicStep = 0;
   let dpadVisible = SHOW_DPAD_BY_DEFAULT;
+  let roundStartTimeoutId = null;
+  let roundIntroTickId = null;
+  let roundIntroUntil = 0;
+  let roundIntroLabel = "";
+  let roundIntroIsLevelUp = false;
+  let foodSpawnCounter = 0;
+  let perfectRoundStreak = 0;
+  let roundStats = null;
+  let burstTimeoutId = null;
+  const perks = {
+    gutShield: 0,
+    molting: 0,
+    acidSpray: 0,
+    scentTrail: 0,
+    digestiveEfficiency: 0
+  };
+  const effects = {
+    burstUntil: 0,
+    scentTrailUntil: 0
+  };
 
   const DIRS = {
     U: { x: 0, y: -1 },
@@ -442,13 +463,23 @@
     "Speed Unlocked!"
   ];
 
-  const ROUND_TARGET_BASE = 7;
-  const ROUND_TARGET_PER_LEVEL = 2;
+  const ROUND_BASE_SEGMENTS = 2;
+  const ROUND_GROWTH_BASE = 5;
+  const ROUND_GROWTH_PER_LEVEL = 1;
+  const ROUND_CLEAR_BONUS_PER_LEVEL = 25;
+  const ROUND_MASS_BONUS_PER_SEG = 5;
+  const ROUND_MIN_EMPTY_CELLS = 8;
+  const PERK_MAX_STACK = 3;
+  const MOLTING_MIN_LENGTH = 7;
+  const SCENT_TRAIL_MS = 6000;
+  const BURST_MS = 2000;
+  const BURST_SPEED_MUL = 0.82;
+  const ROUND_START_DELAY_MS = 3000;
   const MULTI_FOOD_START_LEVEL = 3;
   const MAX_FOOD_COUNT = 4;
-  const TEMP_FOOD_START_LEVEL = 4;
   const TEMP_FOOD_TTL_BASE = 24;
   const TEMP_FOOD_TTL_DROP_PER_LEVEL = 1;
+  const TIMED_ROUTE_SLACK_STEPS = 2;
 
   // Music shape shorthand:
   // A2 B2 A2 C1 B1 O1 => A A B B A A C B O
@@ -467,6 +498,15 @@
       //C: { rootShift: -2, tempoMul: 1.0, leadGate: 0.5, bassEvery: 2, accentEvery: 4, swingShift: 2 },
 //      O: { rootShift: -5, tempoMul: 0.5, leadGate: 1, bassEvery: 8, accentEvery: 8, swingShift: 0 }
     }
+  };
+  // Music <-> game coupling policy.
+  // This lets us declaratively bind music behavior to gameplay state.
+  const MUSIC_BINDINGS = {
+    syncToGameTicks: true,
+    ticksPerMusicStep: 1,
+    keepSectionTempoWhenSynced: true,
+    transposeHalfStepsPerRound: 1,
+    transposeMaxLeadMidi: 84
   };
   const MUSIC_ARRANGEMENT = expandMusicShape(MUSIC_THEME.shape);
 
@@ -501,12 +541,77 @@
   }
 
   function getMusicStepMs(section) {
-    const levelTempoMul = Math.max(0.72, 1 - (level - 1) * 0.018);
-    return Math.max(82, Math.round(MUSIC_THEME.baseStepMs * section.tempoMul * levelTempoMul));
+    return getMusicTempoMs(section);
   }
 
-  function targetLengthForLevel(lvl) {
-    return ROUND_TARGET_BASE + (lvl - 1) * ROUND_TARGET_PER_LEVEL;
+  function getMusicTempoMs(section) {
+    const levelTempoMul = Math.max(0.72, 1 - (level - 1) * 0.018);
+    const themeMs = MUSIC_THEME.baseStepMs * section.tempoMul * levelTempoMul;
+    if (!MUSIC_BINDINGS.syncToGameTicks) {
+      return Math.max(82, Math.round(themeMs));
+    }
+    const tickRatio = Math.max(0.2, MUSIC_BINDINGS.ticksPerMusicStep || 1);
+    let syncedMs = currentTickIntervalMs() * tickRatio;
+    if (MUSIC_BINDINGS.keepSectionTempoWhenSynced) {
+      syncedMs *= section.tempoMul;
+    }
+    return Math.max(45, Math.round(syncedMs));
+  }
+
+  function getMusicRoundTranspose(section, keyShift, levelShift) {
+    const desired = Math.max(0, (level - 1) * (MUSIC_BINDINGS.transposeHalfStepsPerRound || 0));
+    if (desired <= 0) return 0;
+
+    const sectionShifts = Object.keys(MUSIC_THEME.sections).map(function (k) {
+      return MUSIC_THEME.sections[k].rootShift || 0;
+    });
+    const maxSectionShift = sectionShifts.length ? Math.max.apply(null, sectionShifts) : 0;
+    const maxRootBase = MUSIC_THEME.roots.length ? Math.max.apply(null, MUSIC_THEME.roots) : 0;
+    const maxScale = MUSIC_THEME.scale.length ? Math.max.apply(null, MUSIC_THEME.scale) : 0;
+    const maxLeadBase = maxRootBase + maxSectionShift + keyShift + levelShift + 12 + maxScale;
+    const cap = Math.floor(MUSIC_BINDINGS.transposeMaxLeadMidi - maxLeadBase);
+    if (cap <= 0) return 0;
+    return Math.min(desired, cap);
+  }
+
+  function roundBaseLengthForLevel(lvl) {
+    return ROUND_BASE_SEGMENTS + lvl;
+  }
+
+  function roundGrowthGoalForLevel(lvl) {
+    return ROUND_GROWTH_BASE + (lvl - 1) * ROUND_GROWTH_PER_LEVEL;
+  }
+
+  function computeRoundTarget(startLength, lvl) {
+    const maxTarget = Math.max(3, BOARD_PATH.length - ROUND_MIN_EMPTY_CELLS);
+    return Math.min(maxTarget, startLength + roundGrowthGoalForLevel(lvl));
+  }
+
+  function buildBoardPath() {
+    const path = [];
+    for (let y = 0; y < PLAY_ROWS; y++) {
+      if (y % 2 === 0) {
+        for (let x = 0; x < PLAY_COLS; x++) path.push({ x: x, y: y });
+      } else {
+        for (let x = PLAY_COLS - 1; x >= 0; x--) path.push({ x: x, y: y });
+      }
+    }
+    return path;
+  }
+
+  function makeSnakeAtLength(length) {
+    const maxLen = Math.max(3, BOARD_PATH.length - ROUND_MIN_EMPTY_CELLS);
+    const safeLength = Math.max(3, Math.min(maxLen, length));
+    const headIndex = Math.max(
+      safeLength - 1,
+      Math.min(BOARD_PATH.length - 1, Math.floor(BOARD_PATH.length / 2))
+    );
+    const s = [];
+    for (let i = 0; i < safeLength; i++) {
+      const cell = BOARD_PATH[headIndex - i];
+      s.push({ x: cell.x, y: cell.y });
+    }
+    return s;
   }
 
   function desiredFoodCountForLevel(lvl) {
@@ -515,12 +620,199 @@
   }
 
   function tempFoodChanceForLevel(lvl) {
-    if (lvl < TEMP_FOOD_START_LEVEL) return 0;
-    return Math.min(0.62, 0.2 + (lvl - TEMP_FOOD_START_LEVEL) * 0.08);
+    if (desiredFoodCountForLevel(lvl) <= 1) return 0;
+    return 1;
   }
 
   function tempFoodTtlForLevel(lvl) {
     return Math.max(8, TEMP_FOOD_TTL_BASE - (lvl - 1) * TEMP_FOOD_TTL_DROP_PER_LEVEL);
+  }
+
+  function clearRoundIntroTimers() {
+    if (roundStartTimeoutId) {
+      clearTimeout(roundStartTimeoutId);
+      roundStartTimeoutId = null;
+    }
+    if (roundIntroTickId) {
+      clearInterval(roundIntroTickId);
+      roundIntroTickId = null;
+    }
+  }
+
+  function clearBurstTimer() {
+    if (burstTimeoutId) {
+      clearTimeout(burstTimeoutId);
+      burstTimeoutId = null;
+    }
+  }
+
+  function isBurstActive() {
+    return Date.now() < effects.burstUntil;
+  }
+
+  function currentScoreMultiplier() {
+    return isBurstActive() ? 2 : 1;
+  }
+
+  function currentTickIntervalMs() {
+    const base = speed;
+    const burstMul = isBurstActive() ? BURST_SPEED_MUL : 1;
+    return Math.max(45, Math.round(base * burstMul));
+  }
+
+  function restartTickTimer() {
+    if (gameState !== "running") return;
+    clearInterval(intervalId);
+    intervalId = setInterval(tick, currentTickIntervalMs());
+  }
+
+  function activateBurst(reasonText) {
+    const now = Date.now();
+    effects.burstUntil = Math.max(effects.burstUntil, now + BURST_MS);
+    clearBurstTimer();
+    burstTimeoutId = setTimeout(function () {
+      if (gameState === "running") restartTickTimer();
+    }, Math.max(0, effects.burstUntil - now) + 10);
+    if (gameState === "running") restartTickTimer();
+    if (reasonText) {
+      setMessage(reasonText);
+      setTimeout(function () {
+        if (gameState === "running") setMessage("Eat the dung.");
+      }, 640);
+    }
+  }
+
+  function resetRoundStats() {
+    roundStats = {
+      spoiledCount: 0,
+      timedSpawned: 0,
+      timedCollected: 0,
+      orderedTimedChain: 0,
+      burstAwarded: false,
+      stepsSinceEat: 0,
+      pathWaste: 0,
+      eats: 0,
+      preventedDeaths: 0
+    };
+  }
+
+  function canStackPerk(name) {
+    return perks[name] < PERK_MAX_STACK;
+  }
+
+  function grantPerk(name, amount, toastText) {
+    const before = perks[name];
+    perks[name] = Math.min(PERK_MAX_STACK, perks[name] + amount);
+    const gained = perks[name] - before;
+    if (gained > 0 && toastText) {
+      pushToast(toastText + " (" + perks[name] + ")", "level");
+    }
+  }
+
+  function oldestTimedFood() {
+    let oldest = null;
+    for (let i = 0; i < foods.length; i++) {
+      const f = foods[i];
+      if (f.kind !== "temp") continue;
+      if (!oldest || f.spawnId < oldest.spawnId) oldest = f;
+    }
+    return oldest;
+  }
+
+  function ensureTimedRouteFeasible() {
+    if (!snake || snake.length === 0) return;
+    const timedFoods = foods
+      .filter((f) => f.kind === "temp")
+      .sort((a, b) => a.spawnId - b.spawnId);
+    if (timedFoods.length <= 1) return;
+
+    let cursorX = snake[0].x;
+    let cursorY = snake[0].y;
+    let cumulative = 0;
+    for (let i = 0; i < timedFoods.length; i++) {
+      const f = timedFoods[i];
+      cumulative += Math.abs(f.x - cursorX) + Math.abs(f.y - cursorY);
+      const minTtl = cumulative + TIMED_ROUTE_SLACK_STEPS;
+      if (f.ttl < minTtl) {
+        f.ttl = minTtl;
+        if (f.maxTtl < f.ttl) f.maxTtl = f.ttl;
+      }
+      cursorX = f.x;
+      cursorY = f.y;
+    }
+  }
+
+  function consumeScentTrailIfAvailable() {
+    if (perks.scentTrail <= 0) return;
+    if (!foods.some((f) => f.kind === "temp")) return;
+    perks.scentTrail--;
+    effects.scentTrailUntil = Date.now() + SCENT_TRAIL_MS;
+    pushToast("Scent Trail active.", "level");
+  }
+
+  function consumeDigestiveEfficiencyIfAvailable(baseTarget, startLength) {
+    const use = Math.min(2, perks.digestiveEfficiency);
+    if (use <= 0) return baseTarget;
+    perks.digestiveEfficiency -= use;
+    const minTarget = startLength + 2;
+    return Math.max(minTarget, baseTarget - use);
+  }
+
+  function tryAutoPreventDeath(hitWall, hitSelf) {
+    if (hitSelf && perks.acidSpray > 0) {
+      perks.acidSpray--;
+      roundStats.preventedDeaths++;
+      pushToast("Acid Spray phase-through.", "level");
+      setMessage("Acid Spray!");
+      return "phase";
+    }
+
+    if (perks.gutShield > 0) {
+      perks.gutShield--;
+      roundStats.preventedDeaths++;
+      playSfxUi("start");
+      pushToast("Gut Shield blocked crash.", "level");
+      setMessage("Gut Shield saved you.");
+      return "skip";
+    }
+
+    if (perks.molting > 0 && snake.length >= MOLTING_MIN_LENGTH) {
+      perks.molting--;
+      roundStats.preventedDeaths++;
+      const shed = Math.min(2, snake.length - 3);
+      for (let i = 0; i < shed; i++) snake.pop();
+      pushToast("Molting escape! -" + shed + " segments.", "level");
+      setMessage("Molting escape.");
+      return "skip";
+    }
+
+    return "none";
+  }
+
+  function beginRoundIntro(isLevelUp) {
+    clearRoundIntroTimers();
+    clearInterval(intervalId);
+    stopMusic();
+    gameState = "round_intro";
+    roundIntroIsLevelUp = !!isLevelUp;
+    roundIntroUntil = Date.now() + ROUND_START_DELAY_MS;
+    roundIntroLabel = "Level " + level;
+    setMessage(isLevelUp ? "Round cleared. " + roundIntroLabel + " starts in 3..." : "Get ready. " + roundIntroLabel + " starts in 3...");
+    syncControls();
+    draw();
+    roundIntroTickId = setInterval(draw, 100);
+    roundStartTimeoutId = setTimeout(function () {
+      clearRoundIntroTimers();
+      gameState = "running";
+      setMessage("Eat the dung.");
+      playSfxUi("start");
+      consumeScentTrailIfAvailable();
+      startMusic();
+      syncControls();
+      clearInterval(intervalId);
+      intervalId = setInterval(tick, currentTickIntervalMs());
+      draw();
+    }, ROUND_START_DELAY_MS);
   }
 
   function ensureAudio() {
@@ -687,7 +979,9 @@
     const arrangementLoop = Math.floor(sectionTick / MUSIC_ARRANGEMENT.length);
     const keyShift = MUSIC_THEME.keyCycle[arrangementLoop % MUSIC_THEME.keyCycle.length];
     const rootBase = MUSIC_THEME.roots[Math.floor(musicStep / 8) % MUSIC_THEME.roots.length];
-    const root = rootBase + section.rootShift + keyShift + Math.floor((level - 1) / 4) * 2;
+    const levelShift = Math.floor((level - 1) / 4) * 2;
+    const roundTranspose = getMusicRoundTranspose(section, keyShift, levelShift);
+    const root = rootBase + section.rootShift + keyShift + levelShift + roundTranspose;
     const groove = MUSIC_THEME.leadSwing[(musicStep + section.swingShift) % MUSIC_THEME.leadSwing.length];
     const leadDegree = MUSIC_THEME.leadPattern[stepInSection % MUSIC_THEME.leadPattern.length];
     const bassHit = stepInSection % section.bassEvery === 0;
@@ -750,11 +1044,20 @@
   }
 
   function init() {
+    clearRoundIntroTimers();
+    clearBurstTimer();
     stopMusic();
+    effects.burstUntil = 0;
+    effects.scentTrailUntil = 0;
+    perks.gutShield = 0;
+    perks.molting = 0;
+    perks.acidSpray = 0;
+    perks.scentTrail = 0;
+    perks.digestiveEfficiency = 0;
+    perfectRoundStreak = 0;
     score = 0;
     level = 1;
     speed = START_SPEED;
-    roundTargetLength = targetLengthForLevel(level);
     gameState = "idle";
     frame = 0;
     particles = [];
@@ -783,31 +1086,45 @@
     pos.type = Math.floor(Math.random() * PALETTE.food.length);
     pos.kind = kind || "normal";
     if (pos.kind === "temp") {
+      pos.spawnId = ++foodSpawnCounter;
       pos.ttl = tempFoodTtlForLevel(level);
       pos.maxTtl = pos.ttl;
+      if (roundStats) roundStats.timedSpawned++;
     } else {
       pos.ttl = Infinity;
       pos.maxTtl = Infinity;
+      pos.spawnId = 0;
     }
     return pos;
   }
 
   function ensureFoods() {
     const target = desiredFoodCountForLevel(level);
+    const allTimed = target > 1;
     while (foods.length < target) {
-      const kind = Math.random() < tempFoodChanceForLevel(level) ? "temp" : "normal";
+      const kind = allTimed ? "temp" : "normal";
       const next = spawnFood(kind);
       if (!next) break;
       foods.push(next);
     }
+    ensureTimedRouteFeasible();
   }
 
-  function setupRound() {
-    snake = makeInitialSnake();
-    dir = { x: 1, y: 0 };
-    nextDir = { x: 1, y: 0 };
+  function setupRound(carryLength) {
+    const minLength = roundBaseLengthForLevel(level);
+    const desiredLength = Math.max(minLength, carryLength || 0);
+    snake = makeSnakeAtLength(desiredLength);
+    if (snake.length > 1) {
+      dir = { x: snake[0].x - snake[1].x, y: snake[0].y - snake[1].y };
+    } else {
+      dir = { x: 1, y: 0 };
+    }
+    nextDir = { ...dir };
+    roundTargetLength = computeRoundTarget(snake.length, level);
+    roundTargetLength = consumeDigestiveEfficiencyIfAvailable(roundTargetLength, snake.length);
     particles = [];
     foods = [];
+    resetRoundStats();
     ensureFoods();
   }
 
@@ -822,7 +1139,7 @@
     btnRestart.style.display = gameState === "idle" ? "none" : "inline-flex";
     btnPause.textContent = gameState === "paused" ? "Resume" : "Pause";
     btnStart.textContent = "Start";
-    btnStart.disabled = gameState === "running";
+    btnStart.disabled = gameState === "running" || gameState === "round_intro";
   }
 
   function speedForLevel(lvl) {
@@ -831,11 +1148,20 @@
 
   function resetGame() {
     clearInterval(intervalId);
+    clearRoundIntroTimers();
+    clearBurstTimer();
     stopMusic();
+    effects.burstUntil = 0;
+    effects.scentTrailUntil = 0;
+    perks.gutShield = 0;
+    perks.molting = 0;
+    perks.acidSpray = 0;
+    perks.scentTrail = 0;
+    perks.digestiveEfficiency = 0;
+    perfectRoundStreak = 0;
     musicStep = 0;
     score = 0;
     level = 1;
-    roundTargetLength = targetLengthForLevel(level);
     speed = START_SPEED;
     frame = 0;
     setupRound();
@@ -843,26 +1169,10 @@
   }
 
   function startGame() {
-    if (gameState === "running") return;
+    if (gameState === "running" || gameState === "round_intro") return;
     ensureAudio();
     if (gameState === "idle" || gameState === "dead") resetGame();
-    gameState = "running";
-    setMessage("Eat the dung.");
-    playSfxUi("start");
-    startMusic();
-    syncControls();
-    clearInterval(intervalId);
-    intervalId = setInterval(tick, speed);
-  }
-
-  function makeInitialSnake() {
-    const midX = Math.floor(PLAY_COLS / 2);
-    const midY = Math.floor(PLAY_ROWS / 2);
-    return [
-      { x: midX, y: midY },
-      { x: midX - 1, y: midY },
-      { x: midX - 2, y: midY },
-    ];
+    beginRoundIntro(false);
   }
 
   function pauseGame() {
@@ -880,7 +1190,7 @@
       playSfxUi("start");
       startMusic();
       syncControls();
-      intervalId = setInterval(tick, speed);
+      intervalId = setInterval(tick, currentTickIntervalMs());
     }
   }
 
@@ -894,25 +1204,58 @@
   }
 
   function completeRound() {
+    const carryLength = snake.length;
+    const baseAtCurrentLevel = roundBaseLengthForLevel(level);
+    const surplus = Math.max(0, carryLength - baseAtCurrentLevel);
+    const roundBonus = level * ROUND_CLEAR_BONUS_PER_LEVEL + surplus * ROUND_MASS_BONUS_PER_SEG;
+    score += roundBonus;
+    if (score > best) best = score;
+
+    const avgWaste = roundStats.eats > 0 ? roundStats.pathWaste / roundStats.eats : 999;
+    if (roundStats.spoiledCount === 0 && canStackPerk("gutShield")) {
+      grantPerk("gutShield", 1, "Gut Shield gained");
+    }
+    if (roundStats.timedSpawned > 0 && roundStats.timedCollected === roundStats.timedSpawned && canStackPerk("scentTrail")) {
+      grantPerk("scentTrail", 1, "Scent Trail gained");
+    }
+    if (snake.length >= roundBaseLengthForLevel(level) + 5 && canStackPerk("molting")) {
+      grantPerk("molting", 1, "Molting gained");
+    }
+    if (roundStats.eats >= 4 && avgWaste <= 2.2 && canStackPerk("digestiveEfficiency")) {
+      const amount = avgWaste <= 1.3 ? 2 : 1;
+      grantPerk("digestiveEfficiency", amount, "Digestive Efficiency gained");
+    }
+    if (roundStats.spoiledCount === 0 && roundStats.preventedDeaths === 0) {
+      perfectRoundStreak++;
+    } else {
+      perfectRoundStreak = 0;
+    }
+    if (perfectRoundStreak > 0 && perfectRoundStreak % 2 === 0 && canStackPerk("acidSpray")) {
+      grantPerk("acidSpray", 1, "Acid Spray gained");
+    }
+
+    clearBurstTimer();
+    effects.burstUntil = 0;
     level++;
     speed = speedForLevel(level);
-    roundTargetLength = targetLengthForLevel(level);
-    setupRound();
-    clearInterval(intervalId);
-    intervalId = setInterval(tick, speed);
+    setupRound(carryLength);
     playSfxLevel();
+    pushToast("Round clear. +" + roundBonus + " bonus. Goal " + roundTargetLength + ".", "level");
     setMessage(pickRandom(LEVEL_MESSAGES) + "  L" + level);
-    pushToast("Round clear. New goal " + roundTargetLength + ".", "level");
     updateHUD();
+    beginRoundIntro(true);
   }
 
   function updateTimedFoods() {
+    ensureTimedRouteFeasible();
     let expired = 0;
     foods = foods.filter(function (f) {
       if (f.kind !== "temp") return true;
       f.ttl--;
       if (f.ttl > 0) return true;
       expired++;
+      roundStats.spoiledCount++;
+      roundStats.orderedTimedChain = 0;
       return false;
     });
     if (expired > 0) {
@@ -925,6 +1268,7 @@
       }
     }
     ensureFoods();
+    ensureTimedRouteFeasible();
   }
 
   function tick() {
@@ -935,15 +1279,43 @@
     const hitWall = head.x < 0 || head.x >= PLAY_COLS || head.y < 0 || head.y >= PLAY_ROWS;
 
     if (hitWall || hitSelf) {
-      die();
-      return;
+      const rescue = tryAutoPreventDeath(hitWall, hitSelf);
+      if (rescue === "none") {
+        die();
+        return;
+      }
+      if (rescue === "skip") {
+        updateTimedFoods();
+        updateParticles();
+        draw();
+        return;
+      }
     }
 
     snake.unshift(head);
     const eatenIdx = foods.findIndex((f) => f.x === head.x && f.y === head.y);
     if (eatenIdx !== -1) {
+      const oldestTimed = oldestTimedFood();
       const eaten = foods.splice(eatenIdx, 1)[0];
-      const bitePoints = (eaten.kind === "temp" ? 15 : 10) * level;
+      roundStats.pathWaste += roundStats.stepsSinceEat;
+      roundStats.stepsSinceEat = 0;
+      roundStats.eats++;
+      if (eaten.kind === "temp") {
+        roundStats.timedCollected++;
+        if (oldestTimed && eaten.spawnId === oldestTimed.spawnId) {
+          roundStats.orderedTimedChain++;
+        } else {
+          roundStats.orderedTimedChain = 1;
+        }
+        if (roundStats.orderedTimedChain >= 3 && !roundStats.burstAwarded) {
+          roundStats.burstAwarded = true;
+          activateBurst("Fermentation Burst! x2");
+          pushToast("Fermentation Burst active.", "level");
+        }
+      } else {
+        roundStats.orderedTimedChain = 0;
+      }
+      const bitePoints = Math.round((eaten.kind === "temp" ? 15 : 10) * level * currentScoreMultiplier());
       score += bitePoints;
       if (score > best) best = score;
       spawnParticles(eaten.x, eaten.y);
@@ -962,6 +1334,7 @@
       }, 700);
       updateHUD();
     } else {
+      roundStats.stepsSinceEat++;
       snake.pop();
     }
 
@@ -973,6 +1346,8 @@
   function die() {
     gameState = "dead";
     clearInterval(intervalId);
+    clearRoundIntroTimers();
+    clearBurstTimer();
     stopMusic();
     playSfxDeath();
     if (score > best) best = score;
@@ -1050,6 +1425,8 @@
 
   function drawFood() {
     const iconScale = IS_COMPACT ? 0.82 : 0.7;
+    const scentActive = Date.now() < effects.scentTrailUntil;
+    const oldestTimed = scentActive ? oldestTimedFood() : null;
     foods.forEach(function (food, index) {
       const cx = food.x * CELL + CELL / 2;
       const cy = PLAY_TOP + food.y * CELL + CELL / 2;
@@ -1072,6 +1449,13 @@
         ctx.beginPath();
         ctx.arc(cx, cy, r * (0.95 + (1 - lifePct) * 0.1), 0, Math.PI * 2);
         ctx.stroke();
+        if (oldestTimed && food.spawnId === oldestTimed.spawnId) {
+          ctx.strokeStyle = "rgba(255, 248, 178, 0.92)";
+          ctx.lineWidth = 2.4;
+          ctx.beginPath();
+          ctx.arc(cx, cy, r * 1.18, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
 
       ctx.fillStyle = PALETTE.foodShine;
@@ -1246,12 +1630,30 @@
     ctx.fillText("PAUSED", canvas.width / 2, midY);
   }
 
+  function drawRoundIntroOverlay() {
+    const now = Date.now();
+    const seconds = Math.max(1, Math.ceil((roundIntroUntil - now) / 1000));
+    const midY = PLAY_TOP + PLAY_HEIGHT / 2;
+    ctx.fillStyle = "rgba(28, 10, 16, 0.72)";
+    ctx.fillRect(0, PLAY_TOP, canvas.width, PLAY_HEIGHT);
+    ctx.fillStyle = PALETTE.text;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "bold 34px Trebuchet MS, sans-serif";
+    ctx.fillText(roundIntroIsLevelUp ? "ROUND CLEAR" : "GET READY", canvas.width / 2, midY - 62);
+    ctx.font = "bold 28px Consolas, monospace";
+    ctx.fillText(roundIntroLabel, canvas.width / 2, midY - 20);
+    ctx.font = "bold 72px Trebuchet MS, sans-serif";
+    ctx.fillText(String(seconds), canvas.width / 2, midY + 52);
+  }
+
   function draw() {
     drawGrid();
     drawFood();
     drawSnake();
     drawParticles();
     if (gameState === "paused") drawPauseOverlay();
+    if (gameState === "round_intro") drawRoundIntroOverlay();
   }
 
   btnStart.addEventListener("click", startGame);
