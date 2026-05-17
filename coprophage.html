@@ -455,18 +455,17 @@
   const MUSIC_THEME = {
     baseStepMs: 148,
     sectionLengthSteps: 16,
-    shape: "A2 B2 A2 C1 B1 O1",
-    keyCycle: [0, 2, 0, -2],
+    shape: "A1",
+    keyCycle: [0, -3],
     scale: [0, 3, 5, 7, 10],
     roots: [36, 36, 38, 38, 41, 41, 43, 43],
     leadPattern: [0, null, 2, null, 4, null, 2, 1, 0, null, 3, null, 4, null, 2, 1],
     leadSwing: [0, 2, 4, 2, 1, 2, 3, 2],
     sections: {
-      A: { rootShift: 0, tempoMul: 1, leadGate: 0.92, bassEvery: 4, accentEvery: 8, swingShift: 0 },
-//      A: { rootShift: 0, tempoMul: 1, leadGate: 0.92, bassEvery: 4, accentEvery: 8, swingShift: 0 },
-//      B: { rootShift: 2, tempoMul: 0.96, leadGate: 0.86, bassEvery: 4, accentEvery: 4, swingShift: 1 },
-//      C: { rootShift: -2, tempoMul: 1.08, leadGate: 0.74, bassEvery: 2, accentEvery: 4, swingShift: 2 },
-//      O: { rootShift: -5, tempoMul: 1.16, leadGate: 0.65, bassEvery: 8, accentEvery: 8, swingShift: 0 }
+      A: { rootShift: 0, tempoMul: 1, leadGate: 1, bassEvery: 4, accentEvery: 8, swingShift: 0 },
+      //B: { rootShift: 2, tempoMul: 1, leadGate: 1, bassEvery: 4, accentEvery: 4, swingShift: 1 },
+      //C: { rootShift: -2, tempoMul: 1.0, leadGate: 0.5, bassEvery: 2, accentEvery: 4, swingShift: 2 },
+//      O: { rootShift: -5, tempoMul: 0.5, leadGate: 1, bassEvery: 8, accentEvery: 8, swingShift: 0 }
     }
   };
   const MUSIC_ARRANGEMENT = expandMusicShape(MUSIC_THEME.shape);
