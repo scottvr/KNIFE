@@ -463,9 +463,10 @@
     leadSwing: [0, 2, 4, 2, 1, 2, 3, 2],
     sections: {
       A: { rootShift: 0, tempoMul: 1, leadGate: 0.92, bassEvery: 4, accentEvery: 8, swingShift: 0 },
-      B: { rootShift: 2, tempoMul: 0.96, leadGate: 0.86, bassEvery: 4, accentEvery: 4, swingShift: 1 },
-      C: { rootShift: -2, tempoMul: 1.08, leadGate: 0.74, bassEvery: 2, accentEvery: 4, swingShift: 2 },
-      O: { rootShift: -5, tempoMul: 1.16, leadGate: 0.65, bassEvery: 8, accentEvery: 8, swingShift: 0 }
+//      A: { rootShift: 0, tempoMul: 1, leadGate: 0.92, bassEvery: 4, accentEvery: 8, swingShift: 0 },
+//      B: { rootShift: 2, tempoMul: 0.96, leadGate: 0.86, bassEvery: 4, accentEvery: 4, swingShift: 1 },
+//      C: { rootShift: -2, tempoMul: 1.08, leadGate: 0.74, bassEvery: 2, accentEvery: 4, swingShift: 2 },
+//      O: { rootShift: -5, tempoMul: 1.16, leadGate: 0.65, bassEvery: 8, accentEvery: 8, swingShift: 0 }
     }
   };
   const MUSIC_ARRANGEMENT = expandMusicShape(MUSIC_THEME.shape);
@@ -529,11 +530,11 @@
     if (!audioCtx) {
       audioCtx = new AudioCtor();
       audioMaster = audioCtx.createGain();
-      audioMaster.gain.value = 0.44;
+      audioMaster.gain.value = 1.4;
       audioMaster.connect(audioCtx.destination);
 
       musicBus = audioCtx.createGain();
-      musicBus.gain.value = 0.34;
+      musicBus.gain.value = 1.7;
       musicBus.connect(audioMaster);
 
       const sampleLen = Math.floor(audioCtx.sampleRate * 0.4);
