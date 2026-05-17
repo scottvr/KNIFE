@@ -408,6 +408,7 @@
   let musicBus = null;
   let musicTimer = null;
   let musicStep = 0;
+  let musicSyncAccumulator = 0;
   let dpadVisible = SHOW_DPAD_BY_DEFAULT;
   let roundStartTimeoutId = null;
   let roundIntroTickId = null;
@@ -484,7 +485,7 @@
   // Music shape shorthand:
   // A2 B2 A2 C1 B1 O1 => A A B B A A C B O
   const MUSIC_THEME = {
-    baseStepMs: 148,
+    baseStepMs: 200,
     sectionLengthSteps: 16,
     shape: "A1",
     keyCycle: [0, -3],
@@ -504,7 +505,7 @@
   const MUSIC_BINDINGS = {
     syncToGameTicks: true,
     ticksPerMusicStep: 1,
-    keepSectionTempoWhenSynced: true,
+    keepSectionTempoWhenSynced: false,
     transposeHalfStepsPerRound: 1,
     transposeMaxLeadMidi: 84
   };
@@ -556,6 +557,17 @@
       syncedMs *= section.tempoMul;
     }
     return Math.max(45, Math.round(syncedMs));
+  }
+
+  function advanceMusicFromGameTick() {
+    if (!MUSIC_BINDINGS.syncToGameTicks) return;
+    if (gameState !== "running") return;
+    const ratio = Math.max(0.25, MUSIC_BINDINGS.ticksPerMusicStep || 1);
+    musicSyncAccumulator += 1;
+    while (musicSyncAccumulator >= ratio) {
+      musicTick();
+      musicSyncAccumulator -= ratio;
+    }
   }
 
   function getMusicRoundTranspose(section, keyShift, levelShift) {
@@ -1005,6 +1017,11 @@
     if (audioCtx.state === "suspended") {
       audioCtx.resume();
     }
+    if (MUSIC_BINDINGS.syncToGameTicks) {
+      musicSyncAccumulator = 0;
+      musicTick();
+      return;
+    }
     musicTick();
     const schedule = function () {
       if (gameState !== "running") {
@@ -1021,9 +1038,11 @@
   }
 
   function stopMusic() {
-    if (!musicTimer) return;
-    clearTimeout(musicTimer);
-    musicTimer = null;
+    if (musicTimer) {
+      clearTimeout(musicTimer);
+      musicTimer = null;
+    }
+    musicSyncAccumulator = 0;
   }
 
   function pickRandom(items) {
@@ -1273,6 +1292,7 @@
 
   function tick() {
     frame++;
+    advanceMusicFromGameTick();
     dir = { ...nextDir };
     const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
     const hitSelf = snake.slice(1).some((s) => s.x === head.x && s.y === head.y);
