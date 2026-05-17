@@ -428,7 +428,9 @@
   };
   const effects = {
     burstUntil: 0,
-    scentTrailUntil: 0
+    burstReleaseUntil: 0,
+    scentTrailUntil: 0,
+    moltFreezeTicks: 0
   };
 
   const DIRS = {
@@ -473,8 +475,12 @@
   const PERK_MAX_STACK = 3;
   const MOLTING_MIN_LENGTH = 7;
   const SCENT_TRAIL_MS = 6000;
-  const BURST_MS = 2000;
+  const BURST_MS = 4000;
   const BURST_SPEED_MUL = 0.82;
+  const BURST_RELEASE_MS = 900;
+  // Includes the collision-rescue tick itself for ~3 total hold ticks.
+  const MOLT_ESCAPE_FREEZE_TICKS = 2;
+  const STEP_SFX_VOLUME = 0.01;
   const ROUND_START_DELAY_MS = 3000;
   const MULTI_FOOD_START_LEVEL = 3;
   const MAX_FOOD_COUNT = 4;
@@ -484,14 +490,36 @@
 
   // Music shape shorthand:
   // A2 B2 A2 C1 B1 O1 => A A B B A A C B O
+  // Composition model:
+  // - roots: harmonic timeline (key/chord center over time)
+  // - scale: allowed intervals from each root (mode / color)
+  // - leadPattern: melody+rhythm script as scale indices; null = rest
+  // Final lead pitch per step is effectively:
+  //   leadMidi = root + octaveOffset + scale[leadPatternIndex]
+  // where root is further shifted by section/key/round bindings.
+  // Current scale [0,3,5,7,10] is minor pentatonic.
+  // leadSwing: per-step melodic bias added to leadPattern degree before scale lookup.
+  // Example: leadPattern degree 2 + leadSwing value 3 => scale index 5 (mod scale length).
+  // sections keys:
+  // - A: verse / baseline groove
+  // - B: lift / busier accent pattern
+  // - C: contrast / bridge
+  // - O: outro / sparse cooldown
+  // section params:
+  // - rootShift: semitone offset applied to current root.
+  // - tempoMul: per-section tempo multiplier (used in free-running mode, or optionally when synced).
+  // - leadGate: probability [0..1] that a lead note plays on a step.
+  // - bassEvery: play bass every N steps.
+  // - accentEvery: accent every N steps.
+  // - swingShift: phase offset into leadSwing array.
   const MUSIC_THEME = {
     baseStepMs: 200,
     sectionLengthSteps: 16,
     shape: "A1",
-    keyCycle: [0, -3],
+    keyCycle: [0],
     scale: [0, 3, 5, 7, 10],
-    roots: [36, 36, 38, 38, 41, 41, 43, 43],
-    leadPattern: [0, null, 2, null, 4, null, 2, 1, 0, null, 3, null, 4, null, 2, 1],
+    roots: [36, 36, 34, 34, 32, 32, 32, 32], // harmonic center movement
+    leadPattern: [0, null, 0, null, 8, null, -2, 1], // scale degrees over time (null = silence)
     leadSwing: [0, 2, 4, 2, 1, 2, 3, 2],
     sections: {
       A: { rootShift: 0, tempoMul: 1, leadGate: 1, bassEvery: 4, accentEvery: 8, swingShift: 0 },
@@ -502,10 +530,17 @@
   };
   // Music <-> game coupling policy.
   // This lets us declaratively bind music behavior to gameplay state.
+  // Examples:
+  // - syncToGameTicks + ticksPerMusicStep: lock beat grid to board movement.
+  // - transposeHalfStepsPerRound: move whole score upward each round.
+  // - transposeMaxLeadMidi: safety ceiling so transposition stays musical.
   const MUSIC_BINDINGS = {
     syncToGameTicks: true,
     ticksPerMusicStep: 1,
     keepSectionTempoWhenSynced: false,
+    // "baseSpeed": follow level tick pace only (ignores short burst effects).
+    // "actualTick": follow real current tick interval (includes burst effects).
+    syncTempoSource: "actualTick",
     transposeHalfStepsPerRound: 1,
     transposeMaxLeadMidi: 84
   };
@@ -552,7 +587,10 @@
       return Math.max(82, Math.round(themeMs));
     }
     const tickRatio = Math.max(0.2, MUSIC_BINDINGS.ticksPerMusicStep || 1);
-    let syncedMs = currentTickIntervalMs() * tickRatio;
+    const tickMs = MUSIC_BINDINGS.syncTempoSource === "baseSpeed"
+      ? speed
+      : currentTickIntervalMs();
+    let syncedMs = tickMs * tickRatio;
     if (MUSIC_BINDINGS.keepSectionTempoWhenSynced) {
       syncedMs *= section.tempoMul;
     }
@@ -563,7 +601,11 @@
     if (!MUSIC_BINDINGS.syncToGameTicks) return;
     if (gameState !== "running") return;
     const ratio = Math.max(0.25, MUSIC_BINDINGS.ticksPerMusicStep || 1);
-    musicSyncAccumulator += 1;
+    let progress = 1;
+    if (MUSIC_BINDINGS.syncTempoSource === "baseSpeed") {
+      progress = Math.max(0.05, currentTickIntervalMs() / Math.max(1, speed));
+    }
+    musicSyncAccumulator += progress;
     while (musicSyncAccumulator >= ratio) {
       musicTick();
       musicSyncAccumulator -= ratio;
@@ -626,6 +668,28 @@
     return s;
   }
 
+  function isSafeStartMove(moveDir, segments) {
+    if (!segments || segments.length === 0) return false;
+    const hx = segments[0].x + moveDir.x;
+    const hy = segments[0].y + moveDir.y;
+    if (hx < 0 || hx >= PLAY_COLS || hy < 0 || hy >= PLAY_ROWS) return false;
+    for (let i = 1; i < segments.length; i++) {
+      if (segments[i].x === hx && segments[i].y === hy) return false;
+    }
+    return true;
+  }
+
+  function pickSafeStartDir(segments, preferredDir) {
+    const candidates = [];
+    if (preferredDir) candidates.push(preferredDir);
+    candidates.push(DIRS.R, DIRS.D, DIRS.L, DIRS.U);
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i];
+      if (isSafeStartMove(c, segments)) return { x: c.x, y: c.y };
+    }
+    return { x: 1, y: 0 };
+  }
+
   function desiredFoodCountForLevel(lvl) {
     if (lvl < MULTI_FOOD_START_LEVEL) return 1;
     return Math.min(MAX_FOOD_COUNT, 1 + Math.floor((lvl - MULTI_FOOD_START_LEVEL + 2) / 2));
@@ -666,26 +730,57 @@
     return isBurstActive() ? 2 : 1;
   }
 
+  function currentBurstMul() {
+    const now = Date.now();
+    if (now < effects.burstUntil) return BURST_SPEED_MUL;
+    if (now < effects.burstReleaseUntil) {
+      const span = Math.max(1, effects.burstReleaseUntil - effects.burstUntil);
+      const t = Math.max(0, Math.min(1, (now - effects.burstUntil) / span));
+      return BURST_SPEED_MUL + (1 - BURST_SPEED_MUL) * t;
+    }
+    return 1;
+  }
+
   function currentTickIntervalMs() {
     const base = speed;
-    const burstMul = isBurstActive() ? BURST_SPEED_MUL : 1;
+    const burstMul = currentBurstMul();
     return Math.max(45, Math.round(base * burstMul));
   }
 
-  function restartTickTimer() {
-    if (gameState !== "running") return;
-    clearInterval(intervalId);
-    intervalId = setInterval(tick, currentTickIntervalMs());
+  function stopTickLoop() {
+    if (!intervalId) return;
+    clearTimeout(intervalId);
+    intervalId = null;
+  }
+
+  function startTickLoop() {
+    stopTickLoop();
+    const schedule = function () {
+      if (gameState !== "running") {
+        intervalId = null;
+        return;
+      }
+      intervalId = setTimeout(function () {
+        tick();
+        schedule();
+      }, currentTickIntervalMs());
+    };
+    schedule();
   }
 
   function activateBurst(reasonText) {
     const now = Date.now();
+    const wasBursting = now < effects.burstReleaseUntil;
     effects.burstUntil = Math.max(effects.burstUntil, now + BURST_MS);
+    effects.burstReleaseUntil = effects.burstUntil + BURST_RELEASE_MS;
     clearBurstTimer();
     burstTimeoutId = setTimeout(function () {
-      if (gameState === "running") restartTickTimer();
-    }, Math.max(0, effects.burstUntil - now) + 10);
-    if (gameState === "running") restartTickTimer();
+      burstTimeoutId = null;
+    }, Math.max(0, effects.burstReleaseUntil - now) + 10);
+    if (!wasBursting) {
+      playSfxBurstStart();
+      pushToast("Fermentation Burst active.", "level");
+    }
     if (reasonText) {
       setMessage(reasonText);
       setTimeout(function () {
@@ -759,7 +854,12 @@
     if (!foods.some((f) => f.kind === "temp")) return;
     perks.scentTrail--;
     effects.scentTrailUntil = Date.now() + SCENT_TRAIL_MS;
+    playSfxPerk("scent");
     pushToast("Scent Trail active.", "level");
+    setMessage("Scent Trail active.");
+    setTimeout(function () {
+      if (gameState === "running") setMessage("Eat the dung.");
+    }, 640);
   }
 
   function consumeDigestiveEfficiencyIfAvailable(baseTarget, startLength) {
@@ -767,6 +867,8 @@
     if (use <= 0) return baseTarget;
     perks.digestiveEfficiency -= use;
     const minTarget = startLength + 2;
+    playSfxPerk("digestive");
+    pushToast("Digestive Efficiency used. Goal -" + use + ".", "level");
     return Math.max(minTarget, baseTarget - use);
   }
 
@@ -774,6 +876,7 @@
     if (hitSelf && perks.acidSpray > 0) {
       perks.acidSpray--;
       roundStats.preventedDeaths++;
+      playSfxPerk("acid");
       pushToast("Acid Spray phase-through.", "level");
       setMessage("Acid Spray!");
       return "phase";
@@ -782,7 +885,7 @@
     if (perks.gutShield > 0) {
       perks.gutShield--;
       roundStats.preventedDeaths++;
-      playSfxUi("start");
+      playSfxPerk("shield");
       pushToast("Gut Shield blocked crash.", "level");
       setMessage("Gut Shield saved you.");
       return "skip";
@@ -791,11 +894,18 @@
     if (perks.molting > 0 && snake.length >= MOLTING_MIN_LENGTH) {
       perks.molting--;
       roundStats.preventedDeaths++;
-      const shed = Math.min(2, snake.length - 3);
-      for (let i = 0; i < shed; i++) snake.pop();
-      pushToast("Molting escape! -" + shed + " segments.", "level");
-      setMessage("Molting escape.");
-      return "skip";
+      const neck = snake[1];
+      if (neck) {
+        // Tactical molt: retreat head into the neck cell and shed that neck link.
+        // This shortens by one and gives the player a reaction window next tick.
+        snake[0] = { x: neck.x, y: neck.y };
+        snake.splice(1, 1);
+        effects.moltFreezeTicks = MOLT_ESCAPE_FREEZE_TICKS;
+        playSfxPerk("molt");
+        pushToast("Molting escape! -1 segment.", "level");
+        setMessage("Molting escape: reorient!");
+        return "skip";
+      }
     }
 
     return "none";
@@ -803,7 +913,7 @@
 
   function beginRoundIntro(isLevelUp) {
     clearRoundIntroTimers();
-    clearInterval(intervalId);
+    stopTickLoop();
     stopMusic();
     gameState = "round_intro";
     roundIntroIsLevelUp = !!isLevelUp;
@@ -821,8 +931,7 @@
       consumeScentTrailIfAvailable();
       startMusic();
       syncControls();
-      clearInterval(intervalId);
-      intervalId = setInterval(tick, currentTickIntervalMs());
+      startTickLoop();
       draw();
     }, ROUND_START_DELAY_MS);
   }
@@ -833,11 +942,11 @@
     if (!audioCtx) {
       audioCtx = new AudioCtor();
       audioMaster = audioCtx.createGain();
-      audioMaster.gain.value = 1.4;
+      audioMaster.gain.value = 1.6;
       audioMaster.connect(audioCtx.destination);
 
       musicBus = audioCtx.createGain();
-      musicBus.gain.value = 1.7;
+      musicBus.gain.value = 1.5;
       musicBus.connect(audioMaster);
 
       const sampleLen = Math.floor(audioCtx.sampleRate * 0.4);
@@ -886,6 +995,58 @@
     routeNode(plop, 0.09, t, 0.004, 0.1);
     plop.start(t);
     plop.stop(t + 0.13);
+  }
+
+  function playSfxStep() {
+    if (!ensureAudio()) return;
+    const t = audioCtx.currentTime;
+
+    // Hat-like noise burst.
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    const high = audioCtx.createBiquadFilter();
+    high.type = "highpass";
+    high.frequency.setValueAtTime(3400, t);
+    high.frequency.exponentialRampToValueAtTime(4800, t + 0.08);
+    noise.connect(high);
+    routeNode(high, STEP_SFX_VOLUME, t, 0.001, 0.11);
+    noise.start(t);
+    noise.stop(t + 0.12);
+
+    // Short FM-ish metallic ping layered under the noise.
+    const carrier = audioCtx.createOscillator();
+    carrier.type = "triangle";
+    carrier.frequency.setValueAtTime(1300, t);
+    carrier.frequency.exponentialRampToValueAtTime(980, t + 0.12);
+
+    const mod = audioCtx.createOscillator();
+    mod.type = "sine";
+    mod.frequency.setValueAtTime(170, t);
+    const modGain = audioCtx.createGain();
+    modGain.gain.setValueAtTime(700, t);
+    modGain.gain.exponentialRampToValueAtTime(80, t + 0.11);
+    mod.connect(modGain);
+    modGain.connect(carrier.frequency);
+
+    const ring = audioCtx.createBiquadFilter();
+    ring.type = "bandpass";
+    ring.Q.value = 4.5;
+    ring.frequency.setValueAtTime(2100, t);
+    ring.frequency.exponentialRampToValueAtTime(3000, t + 0.1);
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(STEP_SFX_VOLUME * 0.85, t + 0.002);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+
+    carrier.connect(ring);
+    ring.connect(gain);
+    gain.connect(audioMaster);
+
+    carrier.start(t);
+    mod.start(t);
+    carrier.stop(t + 0.14);
+    mod.stop(t + 0.14);
   }
 
   function playSfxLevel() {
@@ -938,6 +1099,62 @@
     routeNode(osc, 0.045, t, 0.003, 0.08);
     osc.start(t);
     osc.stop(t + 0.1);
+  }
+
+  function playSfxPerk(kind) {
+    if (!ensureAudio()) return;
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "triangle";
+    let f1 = 220;
+    let f2 = 330;
+    let vol = 0.05;
+    if (kind === "molt") {
+      f1 = 140;
+      f2 = 240;
+      vol = 0.065;
+    } else if (kind === "acid") {
+      f1 = 260;
+      f2 = 180;
+      vol = 0.055;
+    } else if (kind === "shield") {
+      f1 = 200;
+      f2 = 320;
+      vol = 0.05;
+    } else if (kind === "scent") {
+      f1 = 280;
+      f2 = 360;
+      vol = 0.045;
+    } else if (kind === "digestive") {
+      f1 = 190;
+      f2 = 270;
+      vol = 0.05;
+    }
+    osc.frequency.setValueAtTime(f1, t);
+    osc.frequency.exponentialRampToValueAtTime(f2, t + 0.1);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    osc.connect(gain);
+    gain.connect(audioMaster);
+    osc.start(t);
+    osc.stop(t + 0.16);
+  }
+
+  function playSfxBurstStart() {
+    if (!ensureAudio()) return;
+    const t = audioCtx.currentTime;
+    const notes = [520, 660, 840];
+    notes.forEach(function (freq, i) {
+      const at = t + i * 0.045;
+      const osc = audioCtx.createOscillator();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(freq, at);
+      routeNode(osc, 0.04, at, 0.003, 0.1);
+      osc.start(at);
+      osc.stop(at + 0.12);
+    });
   }
 
   function midiToFreq(midi) {
@@ -1019,7 +1236,6 @@
     }
     if (MUSIC_BINDINGS.syncToGameTicks) {
       musicSyncAccumulator = 0;
-      musicTick();
       return;
     }
     musicTick();
@@ -1067,7 +1283,9 @@
     clearBurstTimer();
     stopMusic();
     effects.burstUntil = 0;
+    effects.burstReleaseUntil = 0;
     effects.scentTrailUntil = 0;
+    effects.moltFreezeTicks = 0;
     perks.gutShield = 0;
     perks.molting = 0;
     perks.acidSpray = 0;
@@ -1133,11 +1351,10 @@
     const minLength = roundBaseLengthForLevel(level);
     const desiredLength = Math.max(minLength, carryLength || 0);
     snake = makeSnakeAtLength(desiredLength);
-    if (snake.length > 1) {
-      dir = { x: snake[0].x - snake[1].x, y: snake[0].y - snake[1].y };
-    } else {
-      dir = { x: 1, y: 0 };
-    }
+    const preferredDir = snake.length > 1
+      ? { x: snake[0].x - snake[1].x, y: snake[0].y - snake[1].y }
+      : { x: 1, y: 0 };
+    dir = pickSafeStartDir(snake, preferredDir);
     nextDir = { ...dir };
     roundTargetLength = computeRoundTarget(snake.length, level);
     roundTargetLength = consumeDigestiveEfficiencyIfAvailable(roundTargetLength, snake.length);
@@ -1166,12 +1383,14 @@
   }
 
   function resetGame() {
-    clearInterval(intervalId);
+    stopTickLoop();
     clearRoundIntroTimers();
     clearBurstTimer();
     stopMusic();
     effects.burstUntil = 0;
+    effects.burstReleaseUntil = 0;
     effects.scentTrailUntil = 0;
+    effects.moltFreezeTicks = 0;
     perks.gutShield = 0;
     perks.molting = 0;
     perks.acidSpray = 0;
@@ -1196,7 +1415,7 @@
 
   function pauseGame() {
     if (gameState === "running") {
-      clearInterval(intervalId);
+      stopTickLoop();
       stopMusic();
       gameState = "paused";
       setMessage("Paused");
@@ -1209,7 +1428,7 @@
       playSfxUi("start");
       startMusic();
       syncControls();
-      intervalId = setInterval(tick, currentTickIntervalMs());
+      startTickLoop();
     }
   }
 
@@ -1255,6 +1474,8 @@
 
     clearBurstTimer();
     effects.burstUntil = 0;
+    effects.burstReleaseUntil = 0;
+    effects.moltFreezeTicks = 0;
     level++;
     speed = speedForLevel(level);
     setupRound(carryLength);
@@ -1293,6 +1514,12 @@
   function tick() {
     frame++;
     advanceMusicFromGameTick();
+    if (effects.moltFreezeTicks > 0) {
+      effects.moltFreezeTicks--;
+      updateParticles();
+      draw();
+      return;
+    }
     dir = { ...nextDir };
     const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
     const hitSelf = snake.slice(1).some((s) => s.x === head.x && s.y === head.y);
@@ -1313,6 +1540,7 @@
     }
 
     snake.unshift(head);
+    playSfxStep();
     const eatenIdx = foods.findIndex((f) => f.x === head.x && f.y === head.y);
     if (eatenIdx !== -1) {
       const oldestTimed = oldestTimedFood();
@@ -1330,7 +1558,6 @@
         if (roundStats.orderedTimedChain >= 3 && !roundStats.burstAwarded) {
           roundStats.burstAwarded = true;
           activateBurst("Fermentation Burst! x2");
-          pushToast("Fermentation Burst active.", "level");
         }
       } else {
         roundStats.orderedTimedChain = 0;
@@ -1365,7 +1592,7 @@
 
   function die() {
     gameState = "dead";
-    clearInterval(intervalId);
+    stopTickLoop();
     clearRoundIntroTimers();
     clearBurstTimer();
     stopMusic();
