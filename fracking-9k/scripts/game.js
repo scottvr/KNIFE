@@ -957,9 +957,9 @@
   const SHIP_MAX_SPEED = 666;
   const BULLET_SPEED = 466;
   const BULLET_LIFE = 0.85;
-  const MAX_BULLETS = 16; // power-of-two ammo ceiling
+  const MAX_BULLETS = 8; // power-of-two ammo ceiling
   const FIRE_COOLDOWN_BASE = 0.0275;
-  const FIRE_PATTERN = [ 8, 4, 2, 2, 1 ];
+  const FIRE_PATTERN = [ 8, 4, 2, 2, 1, 8 ];
   const SHIP_FRACTAL_CLASS = 'mandelbrot_outline'; // 'sierpinski' | 'mandelbrot_outline'
   const SHIP_FRACTAL_CLASSES = ['sierpinski', 'mandelbrot_outline'];
   const FRACTALOID_CLASS = 'cycle'; // 'cycle' | 'tau' | 'magnet' | 'buffalo' | 'tricorn' | 'julia' | 'mandelbrot'
