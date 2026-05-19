@@ -533,6 +533,7 @@
   let roundIntroUntil = 0;
   let roundIntroLabel = "";
   let roundIntroIsLevelUp = false;
+  let roundIntroLastSecond = null;
   let foodSpawnCounter = 0;
   let perfectRoundStreak = 0;
   let roundStats = null;
@@ -954,6 +955,7 @@
       clearInterval(roundIntroTickId);
       roundIntroTickId = null;
     }
+    roundIntroLastSecond = null;
   }
 
   function clearBurstTimer() {
@@ -1259,6 +1261,7 @@
     stopMusic();
     gameState = "round_intro";
     roundIntroIsLevelUp = !!isLevelUp;
+    roundIntroLastSecond = null;
     roundIntroUntil = Date.now() + ROUND_START_DELAY_MS;
     roundIntroLabel = "Level " + level;
     setMessage(isLevelUp ? "Round cleared. " + roundIntroLabel + " in 3..." : "Get ready. " + roundIntroLabel + " in 3...");
@@ -1403,6 +1406,94 @@
       osc.start(t + offset);
       osc.stop(t + offset + 0.16);
     });
+  }
+
+  function playSfxCountdownBang(step) {
+    if (!ensureAudio()) return;
+    const t = audioCtx.currentTime;
+    const weight = step === 1 ? 1.42 : step === 2 ? 1.24 : 1.1;
+
+    const hitBus = audioCtx.createGain();
+    hitBus.gain.value = 1;
+    hitBus.connect(audioMaster);
+
+    const send = audioCtx.createGain();
+    send.gain.value = 0.4;
+    hitBus.connect(send);
+
+    // Lo-fi pseudo reverb via short feedback delays.
+    const delayA = audioCtx.createDelay(0.8);
+    delayA.delayTime.setValueAtTime(0.19, t);
+    const delayB = audioCtx.createDelay(0.8);
+    delayB.delayTime.setValueAtTime(0.37, t);
+    const fbA = audioCtx.createGain();
+    fbA.gain.setValueAtTime(0.45, t);
+    fbA.gain.exponentialRampToValueAtTime(0.0001, t + 0.92);
+    const fbB = audioCtx.createGain();
+    fbB.gain.setValueAtTime(0.31, t);
+    fbB.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    const tailLow = audioCtx.createBiquadFilter();
+    tailLow.type = "lowpass";
+    tailLow.frequency.setValueAtTime(980, t);
+    const tailHigh = audioCtx.createBiquadFilter();
+    tailHigh.type = "highpass";
+    tailHigh.frequency.setValueAtTime(65, t);
+    const wetGain = audioCtx.createGain();
+    wetGain.gain.setValueAtTime(0.0001, t);
+    wetGain.gain.exponentialRampToValueAtTime(0.1, t + 0.04);
+    wetGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+
+    send.connect(delayA);
+    delayA.connect(fbA);
+    fbA.connect(delayA);
+    delayA.connect(delayB);
+    delayB.connect(fbB);
+    fbB.connect(delayB);
+    delayB.connect(tailLow);
+    tailLow.connect(tailHigh);
+    tailHigh.connect(wetGain);
+    wetGain.connect(audioMaster);
+
+    const hitNode = function (node, volume, start, attack, release) {
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume), start + attack);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + attack + release);
+      node.connect(gain);
+      gain.connect(hitBus);
+      return gain;
+    };
+
+    // Big low tom body.
+    const tom = audioCtx.createOscillator();
+    tom.type = "sine";
+    tom.frequency.setValueAtTime(84 * weight, t);
+    tom.frequency.exponentialRampToValueAtTime(28 * weight, t + 0.5);
+    hitNode(tom, 0.19, t, 0.002, 0.62);
+    tom.start(t);
+    tom.stop(t + 0.68);
+
+    // Metallic chip thump layer.
+    const thunk = audioCtx.createOscillator();
+    thunk.type = "triangle";
+    thunk.frequency.setValueAtTime(116 * weight, t);
+    thunk.frequency.exponentialRampToValueAtTime(46 * weight, t + 0.38);
+    hitNode(thunk, 0.088, t + 0.004, 0.0015, 0.44);
+    thunk.start(t + 0.004);
+    thunk.stop(t + 0.5);
+
+    // Noisy impact smack.
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    const band = audioCtx.createBiquadFilter();
+    band.type = "bandpass";
+    band.Q.value = 0.8;
+    band.frequency.setValueAtTime(290 * weight, t);
+    band.frequency.exponentialRampToValueAtTime(96 * weight, t + 0.34);
+    noise.connect(band);
+    hitNode(band, 0.118, t, 0.001, 0.36);
+    noise.start(t);
+    noise.stop(t + 0.4);
   }
 
   function playSfxDeath() {
@@ -2280,6 +2371,10 @@
   function drawRoundIntroOverlay() {
     const now = Date.now();
     const seconds = Math.max(1, Math.ceil((roundIntroUntil - now) / 1000));
+    if (seconds !== roundIntroLastSecond) {
+      roundIntroLastSecond = seconds;
+      playSfxCountdownBang(seconds);
+    }
     const midY = PLAY_TOP + PLAY_HEIGHT / 2;
     ctx.fillStyle = "rgba(28, 10, 16, 0.72)";
     ctx.fillRect(0, PLAY_TOP, canvas.width, PLAY_HEIGHT);
