@@ -868,8 +868,103 @@
     return Math.max(minTarget, baseTarget - use);
   }
 
-  function tryAutoPreventDeath(hitWall, hitSelf) {
+  function cloneSnakeSegments(segments) {
+    return segments.map(function (s) {
+      return { x: s.x, y: s.y };
+    });
+  }
+
+  function countSafeNextMoves(simSnake, facingDir) {
+    if (!simSnake || simSnake.length === 0) return 0;
+    const head = simSnake[0];
+    const dirs = [DIRS.U, DIRS.D, DIRS.L, DIRS.R];
+    let safe = 0;
+    for (let i = 0; i < dirs.length; i++) {
+      const d = dirs[i];
+      if (d.x === -facingDir.x && d.y === -facingDir.y) continue;
+      const nx = head.x + d.x;
+      const ny = head.y + d.y;
+      if (nx < 0 || nx >= PLAY_COLS || ny < 0 || ny >= PLAY_ROWS) continue;
+      const hitBody = simSnake.slice(1).some(function (s) {
+        return s.x === nx && s.y === ny;
+      });
+      if (!hitBody) safe++;
+    }
+    return safe;
+  }
+
+  function simulateRescueOutcome(kind, plannedHead) {
+    const baseSnake = cloneSnakeSegments(snake);
+    const facing = { x: dir.x, y: dir.y };
+    if (kind === "shield") {
+      return { snake: baseSnake, facingDir: facing, safeMoves: countSafeNextMoves(baseSnake, facing), roundComplete: false };
+    }
+    if (kind === "molt") {
+      if (baseSnake.length < MOLTING_MIN_LENGTH || !baseSnake[1]) return null;
+      const neck = baseSnake[1];
+      baseSnake[0] = { x: neck.x, y: neck.y };
+      baseSnake.splice(1, 1);
+      return { snake: baseSnake, facingDir: facing, safeMoves: countSafeNextMoves(baseSnake, facing), roundComplete: false };
+    }
+    if (kind === "acid") {
+      if (!plannedHead) return null;
+      if (plannedHead.x < 0 || plannedHead.x >= PLAY_COLS || plannedHead.y < 0 || plannedHead.y >= PLAY_ROWS) return null;
+      const nextSnake = [{ x: plannedHead.x, y: plannedHead.y }].concat(baseSnake);
+      const eats = foods.some(function (f) {
+        return f.x === plannedHead.x && f.y === plannedHead.y;
+      });
+      if (!eats) nextSnake.pop();
+      const wouldComplete = eats && nextSnake.length >= roundTargetLength;
+      return {
+        snake: nextSnake,
+        facingDir: facing,
+        safeMoves: countSafeNextMoves(nextSnake, facing),
+        roundComplete: wouldComplete
+      };
+    }
+    return null;
+  }
+
+  function chooseBestRescueOption(hitSelf, plannedHead) {
+    const options = [];
     if (hitSelf && perks.acidSpray > 0) {
+      const acidSim = simulateRescueOutcome("acid", plannedHead);
+      if (acidSim) options.push({ kind: "acid", priority: 0, sim: acidSim });
+    }
+    if (perks.gutShield > 0) {
+      const shieldSim = simulateRescueOutcome("shield", plannedHead);
+      if (shieldSim) options.push({ kind: "shield", priority: 1, sim: shieldSim });
+    }
+    if (perks.molting > 0 && snake.length >= MOLTING_MIN_LENGTH) {
+      const moltSim = simulateRescueOutcome("molt", plannedHead);
+      if (moltSim) options.push({ kind: "molt", priority: 2, sim: moltSim });
+    }
+    if (options.length === 0) return null;
+
+    const viable = options.filter(function (o) {
+      return o.sim.roundComplete || o.sim.safeMoves > 0;
+    });
+    if (viable.length === 0) return null;
+
+    viable.sort(function (a, b) {
+      if (a.sim.roundComplete !== b.sim.roundComplete) {
+        return a.sim.roundComplete ? -1 : 1;
+      }
+      if (a.sim.safeMoves !== b.sim.safeMoves) {
+        return b.sim.safeMoves - a.sim.safeMoves;
+      }
+      return a.priority - b.priority;
+    });
+    return viable[0].kind;
+  }
+
+  function tryAutoPreventDeath(hitSelf, plannedHead) {
+    const choice = chooseBestRescueOption(hitSelf, plannedHead);
+    if (!choice) {
+      return "none";
+    }
+
+    if (choice === "acid") {
       perks.acidSpray--;
       roundStats.preventedDeaths++;
       playSfxPerk("acid");
@@ -878,7 +973,7 @@
       return "phase";
     }
 
-    if (perks.gutShield > 0) {
+    if (choice === "shield") {
       perks.gutShield--;
       roundStats.preventedDeaths++;
       playSfxPerk("shield");
@@ -887,7 +982,7 @@
       return "skip";
     }
 
-    if (perks.molting > 0 && snake.length >= MOLTING_MIN_LENGTH) {
+    if (choice === "molt" && perks.molting > 0 && snake.length >= MOLTING_MIN_LENGTH) {
       perks.molting--;
       roundStats.preventedDeaths++;
       const neck = snake[1];
@@ -1522,7 +1617,7 @@
     const hitWall = head.x < 0 || head.x >= PLAY_COLS || head.y < 0 || head.y >= PLAY_ROWS;
 
     if (hitWall || hitSelf) {
-      const rescue = tryAutoPreventDeath(hitWall, hitSelf);
+      const rescue = tryAutoPreventDeath(hitSelf, head);
       if (rescue === "none") {
         die();
         return;
