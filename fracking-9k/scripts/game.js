@@ -1101,6 +1101,10 @@
   const NON_EUCLIDEAN_DISK_FILL = 0.46;
   const NON_EUCLIDEAN_CURVATURE_MUL = 1.0;
   const NON_EUCLIDEAN_FAR_FIELD_RADIUS_MUL = 8.0;
+  const NON_EUCLIDEAN_GUIDE_DT = 0.09;
+  const NON_EUCLIDEAN_GUIDE_STEPS = 11;
+  const NON_EUCLIDEAN_LEAD_TIME_FRACTALOID = 0.68;
+  const NON_EUCLIDEAN_LEAD_TIME_SAUCER = 0.56;
   const nonEuclideanRuntime = (window.FrackingNonEuclideanRuntime && typeof window.FrackingNonEuclideanRuntime.create === 'function')
     ? window.FrackingNonEuclideanRuntime.create({
         geometry: nonEuclideanGeometry,
@@ -1604,6 +1608,13 @@
       timeSec,
       strokeWithVectorGlow
     });
+    ctx.save();
+    ctx.fillStyle = 'rgba(205, 229, 246, 0.94)';
+    ctx.font = '13px "VT323", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(nonEuclideanHintText(timeSec), 18, 35);
+    ctx.restore();
   }
 
   function translateUniverse(dx, dy) {
@@ -1680,6 +1691,166 @@
     if (saucer && isOutsideNonEuclideanFarField(saucer, (saucer.r || 0) + 260)) {
       saucer = null;
     }
+  }
+
+  function nonEuclideanHintText(timeSec) {
+    const phase = Math.floor(Math.max(0, timeSec) / 5.2) % 3;
+    if (phase === 0) return 'TIP: THRUST TO WARP SHOT PATHS.';
+    if (phase === 1) return 'TIP: LEAD THE GLOW MARKER, NOT THE HULL.';
+    return 'TIP: CURVATURE ORBS EXTEND THE BREACH.';
+  }
+
+  function drawNonEuclideanTrajectoryGuide(s, timeSec) {
+    if (!ctx || !s || !s.alive || !hasNonEuclideanMode()) return;
+    const intents = inputFeelSystem.getIntents();
+    const dt = NON_EUCLIDEAN_GUIDE_DT;
+    const steps = NON_EUCLIDEAN_GUIDE_STEPS;
+    const points = [];
+
+    let simShipVx = s.vx;
+    let simShipVy = s.vy;
+    let bulletX = s.x + Math.cos(s.angle) * SHIP_SIZE;
+    let bulletY = s.y + Math.sin(s.angle) * SHIP_SIZE;
+    const bulletVx = Math.cos(s.angle) * BULLET_SPEED + simShipVx * 0.5;
+    const bulletVy = Math.sin(s.angle) * BULLET_SPEED + simShipVy * 0.5;
+    let shiftX = 0;
+    let shiftY = 0;
+
+    for (let i = 0; i < steps; i++) {
+      bulletX += bulletVx * dt;
+      bulletY += bulletVy * dt;
+
+      if (intents.thrust) {
+        simShipVx += Math.cos(s.angle) * SHIP_THRUST * dt;
+        simShipVy += Math.sin(s.angle) * SHIP_THRUST * dt;
+        const sp = Math.hypot(simShipVx, simShipVy);
+        if (sp > SHIP_MAX_SPEED) {
+          simShipVx = simShipVx / sp * SHIP_MAX_SPEED;
+          simShipVy = simShipVy / sp * SHIP_MAX_SPEED;
+        }
+      }
+      const fr = Math.pow(1 - SHIP_FRICTION, dt);
+      simShipVx *= fr;
+      simShipVy *= fr;
+      shiftX += -simShipVx * dt;
+      shiftY += -simShipVy * dt;
+
+      const p = projectNonEuclideanPoint(bulletX + shiftX, bulletY + shiftY, 1.2);
+      if (p.hidden) break;
+      points.push({ x: p.x, y: p.y, scale: p.scale });
+    }
+    if (points.length < 2) return;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1];
+      const b = points[i];
+      const t = i / points.length;
+      const alpha = 0.18 + t * 0.34 + Math.sin(timeSec * 4.2 + i * 0.7) * 0.04;
+      ctx.strokeStyle = `rgba(162, 233, 255, ${Math.max(0.12, Math.min(0.64, alpha))})`;
+      ctx.lineWidth = Math.max(0.55, (0.8 + t * 1.2) * (a.scale + b.scale) * 0.5);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+
+    const tail = points[points.length - 1];
+    ctx.fillStyle = 'rgba(214, 246, 255, 0.9)';
+    ctx.beginPath();
+    ctx.arc(tail.x, tail.y, Math.max(1.2, 2.1 * tail.scale), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function selectNonEuclideanLeadThreat(s) {
+    if (!s) return null;
+    const cx = W * 0.5;
+    const cy = H * 0.5;
+    let best = null;
+    let bestScore = -Infinity;
+
+    const evaluate = (obj, kind) => {
+      if (!obj) return;
+      const projected = projectNonEuclideanPoint(obj.x, obj.y, obj.r || 10);
+      if (projected.hidden) return;
+      const dx = projected.x - cx;
+      const dy = projected.y - cy;
+      const d2 = dx * dx + dy * dy;
+      const approach = Math.max(0, -((dx * ((obj.vx || 0) - (s.vx || 0)) + dy * ((obj.vy || 0) - (s.vy || 0))) / Math.max(1, Math.hypot(dx, dy))));
+      const base = 1 / (1 + d2 * 0.00006);
+      const score = base + Math.min(0.45, approach * 0.0032) + (kind === 'saucer' ? 0.09 : 0);
+      if (score > bestScore) {
+        bestScore = score;
+        best = { obj, kind, projected };
+      }
+    };
+
+    if (saucer) evaluate(saucer, 'saucer');
+    for (const a of fractaloids) evaluate(a, 'fractaloid');
+    return best;
+  }
+
+  function drawNonEuclideanLeadCue(s, timeSec) {
+    if (!ctx || !s || !s.alive || !hasNonEuclideanMode()) return;
+    const chosen = selectNonEuclideanLeadThreat(s);
+    if (!chosen) return;
+    const target = chosen.obj;
+    const current = chosen.projected;
+    const leadT = chosen.kind === 'saucer'
+      ? NON_EUCLIDEAN_LEAD_TIME_SAUCER
+      : NON_EUCLIDEAN_LEAD_TIME_FRACTALOID;
+    const leadX = target.x + ((target.vx || 0) - (s.vx || 0)) * leadT;
+    const leadY = target.y + ((target.vy || 0) - (s.vy || 0)) * leadT;
+    const lead = projectNonEuclideanPoint(leadX, leadY, 2.0);
+    if (lead.hidden) return;
+
+    const pulse = 0.58 + 0.42 * Math.sin(timeSec * 6.6);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    ctx.strokeStyle = `rgba(255, 215, 132, ${0.32 + pulse * 0.34})`;
+    ctx.lineWidth = Math.max(0.7, 1.2 * current.scale);
+    ctx.beginPath();
+    ctx.arc(current.x, current.y, Math.max(10, 14 * current.scale + pulse * 4), 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(255, 238, 178, ${0.42 + pulse * 0.28})`;
+    ctx.lineWidth = Math.max(0.65, 1.0 * lead.scale);
+    ctx.setLineDash([4, 5]);
+    ctx.beginPath();
+    ctx.moveTo(W * 0.5, H * 0.5);
+    ctx.lineTo(lead.x, lead.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const markerR = Math.max(2.1, 3.8 * lead.scale);
+    ctx.strokeStyle = `rgba(255, 244, 198, ${0.52 + pulse * 0.26})`;
+    ctx.lineWidth = Math.max(0.75, 1.1 * lead.scale);
+    ctx.beginPath();
+    ctx.moveTo(lead.x - markerR, lead.y);
+    ctx.lineTo(lead.x + markerR, lead.y);
+    ctx.moveTo(lead.x, lead.y - markerR);
+    ctx.lineTo(lead.x, lead.y + markerR);
+    ctx.stroke();
+
+    ctx.fillStyle = `rgba(255, 232, 168, ${0.56 + pulse * 0.24})`;
+    ctx.font = '13px "VT323", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('LEAD', lead.x + 7, lead.y - 3);
+    ctx.restore();
+  }
+
+  function drawNonEuclideanGuidance(timeSec) {
+    if (!hasNonEuclideanMode() || !ship || !ship.alive) return;
+    const intents = inputFeelSystem.getIntents();
+    const showTrajectory = !!(intents.fire || intents.thrust || ship.fireTimer <= FIRE_COOLDOWN_BASE * 1.2);
+    if (showTrajectory) drawNonEuclideanTrajectoryGuide(ship, timeSec);
+    drawNonEuclideanLeadCue(ship, timeSec);
   }
 
 
@@ -2858,6 +3029,9 @@
       drawShockwaves();
       drawSaucer();
       if (state === 'playing' || state === 'nonEuclidean') drawShip(ship);
+      if (state === 'nonEuclidean') {
+        drawNonEuclideanGuidance(totalTime);
+      }
       drawBullets();
       drawParticles();
 

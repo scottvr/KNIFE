@@ -70,6 +70,11 @@ Deliverable:
 - Improve projectile readability (arc trails, lead cues, optional teaching prompts).
 - Tune handling so aiming remains challenging but learnable.
 
+Deliverable:
+- Non-Euclidean mode renders a predictive curved trajectory guide while engaging thrust/fire.
+- A lead marker highlights an intercept-biased target point for current threats.
+- Rotating instructional hint text is shown alongside the non-Euclidean overlay banner.
+
 ### Slice 6: Intermission Productization
 - Add entry/exit transitions and reward model.
 - Integrate into cadence as bonus stage.
