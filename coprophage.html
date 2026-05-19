@@ -163,6 +163,103 @@
     pointer-events: none;
   }
 
+  #copro-perks {
+    position: absolute;
+    z-index: 6;
+    left: 12px;
+    bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    pointer-events: none;
+    max-width: min(46vw, 280px);
+  }
+
+  #copro-perks.mode-outside {
+    position: fixed;
+    left: 12px;
+    top: 12px;
+    bottom: auto;
+    max-width: 260px;
+  }
+
+  #copro-perks.mode-outside-compact {
+    position: fixed;
+    left: 12px;
+    top: 12px;
+    bottom: auto;
+    max-width: 84px;
+    gap: 4px;
+  }
+
+  #copro-perks.mode-outside-compact .copro-perk {
+    padding: 4px 7px;
+    gap: 5px;
+    font-size: 11px;
+  }
+
+  #copro-perks.mode-outside-compact .copro-perk .label {
+    display: none;
+  }
+
+  #copro-perks.mode-band,
+  #copro-perks.mode-overlay {
+    position: absolute;
+    left: 8px;
+    top: auto;
+    bottom: 8px;
+    max-width: calc(100% - 16px);
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .copro-perk {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(20, 10, 5, 0.8);
+    border: 1px solid rgba(255, 232, 193, 0.28);
+    border-radius: 999px;
+    padding: 5px 9px;
+    color: var(--copro-ink);
+    font: 700 12px/1 "Consolas", "Courier New", monospace;
+    letter-spacing: 0.01em;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.24);
+    backdrop-filter: blur(2px);
+  }
+
+  #copro-perks.mode-band .copro-perk,
+  #copro-perks.mode-overlay .copro-perk {
+    padding: 4px 7px;
+    gap: 5px;
+    font-size: 11px;
+  }
+
+  #copro-perks.mode-band .copro-perk .label,
+  #copro-perks.mode-overlay .copro-perk .label {
+    display: none;
+  }
+
+  .copro-perk.is-empty {
+    opacity: 0.42;
+  }
+
+  .copro-perk .icon {
+    width: 15px;
+    text-align: center;
+    font-size: 13px;
+  }
+
+  .copro-perk .count {
+    min-width: 15px;
+    text-align: right;
+    color: #ffe7b3;
+    font-weight: 800;
+  }
+
   .copro-toast {
     background: rgba(20, 10, 5, 0.82);
     border: 1px solid rgba(255, 232, 193, 0.3);
@@ -285,6 +382,23 @@
       gap: 4px;
     }
 
+    #copro-perks {
+      left: 8px;
+      bottom: 8px;
+      gap: 4px;
+      max-width: 44vw;
+    }
+
+    .copro-perk {
+      padding: 4px 7px;
+      gap: 5px;
+      font-size: 11px;
+    }
+
+    .copro-perk .label {
+      display: none;
+    }
+
     .copro-toast {
       font-size: 12px;
       padding: 6px 8px;
@@ -314,15 +428,18 @@
         <span>Best <strong id="best">0</strong></span>
         <span>Lvl <strong id="level">1</strong></span>
         <span>Goal <strong id="goal">0</strong></span>
+        <span>Ctrl <strong id="ctrl-mode">Direct</strong></span>
       </div>
       <div id="copro-controls">
         <button id="btn-start" title="Start (Space)">Start</button>
         <button id="btn-pause" title="Pause (Space)">Pause</button>
+        <button id="btn-mode" title="Control mode (C)">Mode</button>
         <button id="btn-restart" style="display:none" title="Restart">Reset</button>
       </div>
     </div>
     <div id="copro-msg" aria-live="polite">Press Space to Begin</div>
     <div id="copro-toasts" aria-live="polite" aria-atomic="false"></div>
+    <div id="copro-perks" aria-live="polite" aria-atomic="false"></div>
     <div class="dpad" aria-label="Direction controls">
       <div class="blank"></div>
       <button data-dir="U" aria-label="Up">▲</button>
@@ -361,11 +478,14 @@
 
   const canvas = document.getElementById("copro-canvas");
   const ctx = canvas.getContext("2d");
+  const stage = document.getElementById("copro-stage");
   const dpad = document.querySelector(".dpad");
   const msg = document.getElementById("copro-msg");
   const toastHost = document.getElementById("copro-toasts");
+  const perkHud = document.getElementById("copro-perks");
   const btnStart = document.getElementById("btn-start");
   const btnPause = document.getElementById("btn-pause");
+  const btnMode = document.getElementById("btn-mode");
   const btnRestart = document.getElementById("btn-restart");
   canvas.width = COLS * CELL;
   canvas.height = ROWS * CELL;
@@ -399,6 +519,7 @@
   let intervalId;
   let frame;
   let particles;
+  let controlMode = "direct";
   let audioCtx = null;
   let audioMaster = null;
   let noiseBuffer = null;
@@ -484,6 +605,13 @@
   const TEMP_FOOD_TTL_BASE = 24;
   const TEMP_FOOD_TTL_DROP_PER_LEVEL = 1;
   const TIMED_ROUTE_SLACK_STEPS = 2;
+  const PERK_META = [
+    { key: "gutShield", icon: "🛡", label: "Shield" },
+    { key: "molting", icon: "🪱", label: "Molt" },
+    { key: "acidSpray", icon: "🧪", label: "Acid" },
+    { key: "scentTrail", icon: "👃", label: "Scent" },
+    { key: "digestiveEfficiency", icon: "⚡", label: "Digest" }
+  ];
 
   // Music shape shorthand:
   // A2 B2 A2 C1 B1 O1 => A A B B A A C B O
@@ -547,9 +675,125 @@
     msg.textContent = text;
   }
 
+  function controlModeLabel(mode) {
+    return mode === "steer" ? "Steer" : "Direct";
+  }
+
+  function renderPerkHUD() {
+    if (!perkHud) return;
+    perkHud.textContent = "";
+    PERK_META.forEach(function (meta) {
+      const count = perks[meta.key] || 0;
+      const row = document.createElement("div");
+      row.className = "copro-perk" + (count > 0 ? "" : " is-empty");
+      row.innerHTML =
+        '<span class="icon">' + meta.icon + '</span>' +
+        '<span class="label">' + meta.label + "</span>" +
+        '<span class="count">x' + count + "</span>";
+      perkHud.appendChild(row);
+    });
+  }
+
+  function setPerkHudMode(mode) {
+    if (!perkHud) return;
+    perkHud.classList.remove("mode-outside", "mode-outside-compact", "mode-band", "mode-overlay");
+    perkHud.classList.add("mode-" + mode);
+  }
+
+  function applyPerkHudLayout() {
+    if (!perkHud || !stage) return;
+
+    // Tier 1: outside the play stage when viewport has side gutter room.
+    setPerkHudMode("outside");
+    perkHud.style.left = "";
+    perkHud.style.top = "";
+    perkHud.style.bottom = "";
+    const stageRect = stage.getBoundingClientRect();
+    const scale = stageRect.width / Math.max(1, canvas.width);
+    const fullRect = perkHud.getBoundingClientRect();
+    const fullW = Math.ceil(fullRect.width);
+    const fullH = Math.ceil(fullRect.height);
+    const leftRoom = Math.max(0, Math.floor(stageRect.left) - 8);
+    const rightRoom = Math.max(0, Math.floor(window.innerWidth - stageRect.right) - 8);
+    const canOutsideLeft = leftRoom >= fullW + 10;
+    const canOutsideRight = rightRoom >= fullW + 10;
+    if ((canOutsideLeft || canOutsideRight) && fullH + 16 <= window.innerHeight) {
+      const preferRight = canOutsideRight && (!canOutsideLeft || rightRoom >= leftRoom);
+      const y = Math.max(8, Math.min(window.innerHeight - fullH - 8, stageRect.top + 8));
+      perkHud.style.left = preferRight
+        ? Math.round(stageRect.right + 10) + "px"
+        : Math.round(stageRect.left - fullW - 10) + "px";
+      perkHud.style.top = Math.round(y) + "px";
+      return;
+    }
+
+    // Tier 1b: still prefer outside; switch to icons-only outside before using in-stage spots.
+    setPerkHudMode("outside-compact");
+    const compactRect = perkHud.getBoundingClientRect();
+    const compactW = Math.ceil(compactRect.width);
+    const compactH = Math.ceil(compactRect.height);
+    const canOutsideCompactLeft = leftRoom >= compactW + 10;
+    const canOutsideCompactRight = rightRoom >= compactW + 10;
+    if ((canOutsideCompactLeft || canOutsideCompactRight) && compactH + 16 <= window.innerHeight) {
+      const preferRightCompact = canOutsideCompactRight && (!canOutsideCompactLeft || rightRoom >= leftRoom);
+      const yCompact = Math.max(8, Math.min(window.innerHeight - compactH - 8, stageRect.top + 8));
+      perkHud.style.left = preferRightCompact
+        ? Math.round(stageRect.right + 10) + "px"
+        : Math.round(stageRect.left - compactW - 10) + "px";
+      perkHud.style.top = Math.round(yCompact) + "px";
+      perkHud.style.bottom = "auto";
+      return;
+    }
+
+    // Tier 2: icons-only in bottom safe band (outside grid area).
+    setPerkHudMode("band");
+    perkHud.style.left = "8px";
+    perkHud.style.top = "";
+    perkHud.style.bottom = "0px";
+    const bandRect = perkHud.getBoundingClientRect();
+    const bandH = Math.ceil(bandRect.height);
+    const bandW = Math.ceil(bandRect.width);
+    const safeBandH = (canvas.height - PLAY_BOTTOM) * scale;
+    const dpadW = dpadVisible ? Math.ceil(dpad.getBoundingClientRect().width) + 10 : 0;
+    const availableBandW = Math.max(0, stageRect.width - 16 - dpadW);
+    const fitsBand = bandH <= Math.max(18, safeBandH - 2) && bandW <= availableBandW;
+    if (fitsBand) {
+      const top = PLAY_BOTTOM * scale + Math.max(1, Math.floor((safeBandH - bandH) / 2));
+      perkHud.style.top = top + "px";
+      perkHud.style.bottom = "auto";
+      return;
+    }
+
+    // Tier 3: icons-only over grid as last resort.
+    setPerkHudMode("overlay");
+    perkHud.style.left = "8px";
+    perkHud.style.top = (PLAY_TOP * scale + 8) + "px";
+    perkHud.style.bottom = "auto";
+  }
+
+  function setControlMode(mode, announce) {
+    const normalized = mode === "steer" ? "steer" : "direct";
+    const changed = controlMode !== normalized;
+    controlMode = normalized;
+    const modeNode = document.getElementById("ctrl-mode");
+    if (modeNode) modeNode.textContent = controlModeLabel(controlMode);
+    if (changed && announce) {
+      pushToast("Control mode: " + controlModeLabel(controlMode) + ".", "level");
+      setMessage(controlMode === "steer" ? "Steer mode: L/U = left turn, R/D = right turn." : "Direct mode: arrows/WASD set heading.");
+      setTimeout(function () {
+        if (gameState === "running") setMessage("Eat the dung.");
+      }, 950);
+    }
+  }
+
+  function cycleControlMode(announce) {
+    setControlMode(controlMode === "direct" ? "steer" : "direct", announce);
+  }
+
   function setDpadVisible(visible, announce) {
     dpadVisible = !!visible;
     dpad.classList.toggle("is-hidden", !dpadVisible);
+    applyPerkHudLayout();
     if (announce && !IS_COMPACT) {
       pushToast(dpadVisible ? "D-pad on." : "D-pad off.");
     }
@@ -810,6 +1054,7 @@
     const gained = perks[name] - before;
     if (gained > 0 && toastText) {
       pushToast(toastText + " (" + perks[name] + ")", "level");
+      updateHUD();
     }
   }
 
@@ -851,6 +1096,7 @@
     if (!foods.some((f) => f.kind === "temp")) return;
     perks.scentTrail--;
     effects.scentTrailUntil = Date.now() + SCENT_TRAIL_MS;
+    updateHUD();
     playSfxPerk("scent");
     pushToast("Scent Trail active.", "level");
     setMessage("Scent Trail active.");
@@ -863,6 +1109,7 @@
     const use = Math.min(2, perks.digestiveEfficiency);
     if (use <= 0) return baseTarget;
     perks.digestiveEfficiency -= use;
+    updateHUD();
     const minTarget = startLength + 2;
     playSfxPerk("digestive");
     pushToast("Digestive Efficiency used. Goal -" + use + ".", "level");
@@ -968,6 +1215,7 @@
     if (choice === "acid") {
       perks.acidSpray--;
       roundStats.preventedDeaths++;
+      updateHUD();
       playSfxPerk("acid");
       pushToast("Acid Spray phase-through.", "level");
       setMessage("Acid Spray!");
@@ -977,6 +1225,7 @@
     if (choice === "shield") {
       perks.gutShield--;
       roundStats.preventedDeaths++;
+      updateHUD();
       playSfxPerk("shield");
       pushToast("Gut Shield blocked crash.", "level");
       setMessage("Gut Shield saved you.");
@@ -986,6 +1235,7 @@
     if (choice === "molt" && perks.molting > 0 && snake.length >= MOLTING_MIN_LENGTH) {
       perks.molting--;
       roundStats.preventedDeaths++;
+      updateHUD();
       const neck = snake[1];
       if (neck) {
         // Tactical molt: retreat head into the neck cell and shed that neck link.
@@ -1488,6 +1738,10 @@
     document.getElementById("best").textContent = best;
     document.getElementById("level").textContent = level;
     document.getElementById("goal").textContent = roundTargetLength;
+    const modeNode = document.getElementById("ctrl-mode");
+    if (modeNode) modeNode.textContent = controlModeLabel(controlMode);
+    renderPerkHUD();
+    applyPerkHudLayout();
   }
 
   function syncControls() {
@@ -1549,6 +1803,30 @@
       syncControls();
       startTickLoop();
     }
+  }
+
+  function rotateDir90(base, clockwise) {
+    return clockwise
+      ? { x: -base.y, y: base.x }
+      : { x: base.y, y: -base.x };
+  }
+
+  function turnRelative(clockwise) {
+    const base = nextDir || dir || { x: 1, y: 0 };
+    nextDir = rotateDir90(base, clockwise);
+    if (gameState === "idle" || gameState === "dead") {
+      startGame();
+    }
+  }
+
+  function applyDirectionalControl(next) {
+    if (controlMode === "steer") {
+      // Steer mode maps all direction keys to left/right turns only.
+      const turnRight = next === DIRS.R || next === DIRS.D;
+      turnRelative(turnRight);
+      return;
+    }
+    turnTo(next);
   }
 
   function turnTo(next) {
@@ -2027,6 +2305,9 @@
 
   btnStart.addEventListener("click", startGame);
   btnPause.addEventListener("click", pauseGame);
+  btnMode.addEventListener("click", function () {
+    cycleControlMode(true);
+  });
   btnRestart.addEventListener("click", function () {
     resetGame();
     startGame();
@@ -2038,7 +2319,7 @@
       ensureAudio();
       btn.classList.add("is-active");
       const d = DIRS[btn.dataset.dir];
-      turnTo(d);
+      applyDirectionalControl(d);
       setTimeout(function () {
         btn.classList.remove("is-active");
       }, 90);
@@ -2062,8 +2343,8 @@
     const absX = Math.abs(dx);
     const absY = Math.abs(dy);
     if (Math.max(absX, absY) > 18) {
-      if (absX > absY) turnTo(dx > 0 ? DIRS.R : DIRS.L);
-      else turnTo(dy > 0 ? DIRS.D : DIRS.U);
+      if (absX > absY) applyDirectionalControl(dx > 0 ? DIRS.R : DIRS.L);
+      else applyDirectionalControl(dy > 0 ? DIRS.D : DIRS.U);
     }
     pointerStart = null;
   });
@@ -2073,6 +2354,21 @@
 
   document.addEventListener("keydown", function (e) {
     ensureAudio();
+    if (e.key === "1") {
+      e.preventDefault();
+      setControlMode("direct", true);
+      return;
+    }
+    if (e.key === "2") {
+      e.preventDefault();
+      setControlMode("steer", true);
+      return;
+    }
+    if (e.key && e.key.toLowerCase() === "c") {
+      e.preventDefault();
+      cycleControlMode(true);
+      return;
+    }
     if (!SHOW_DPAD_BY_DEFAULT && e.key && e.key.toLowerCase() === "v") {
       e.preventDefault();
       setDpadVisible(!dpadVisible, true);
@@ -2090,13 +2386,17 @@
     };
     if (map[e.key]) {
       e.preventDefault();
-      turnTo(DIRS[map[e.key]]);
+      applyDirectionalControl(DIRS[map[e.key]]);
     }
     if (e.code === "Space") {
       e.preventDefault();
       if (gameState === "idle" || gameState === "dead") startGame();
       else pauseGame();
     }
+  });
+
+  window.addEventListener("resize", function () {
+    applyPerkHudLayout();
   });
 
   init();
