@@ -130,21 +130,21 @@
     position: absolute;
     z-index: 7;
     left: 50%;
-    top: 10px;
+    top: 40px;
     transform: translateX(-50%);
-    width: min(50%, 440px);
+    width: 44%;
     text-align: center;
     color: var(--copro-ink);
-    background: rgba(20, 10, 5, 0.8);
+    background: rgba(20, 15, 10, 0.1);
     border: 1px solid rgba(255, 232, 193, 0.28);
     border-radius: 999px;
-    padding: 10px 18px;
-    font: 800 22px/1.05 "Trebuchet MS", "Segoe UI", sans-serif;
+    padding: 10px 22px;
+    font: 800 20px/1.05 "Trebuchet MS", "Segoe UI", sans-serif;
     line-height: 1.1;
     letter-spacing: 0.01em;
-    backdrop-filter: blur(3px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
-    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+    text-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -307,7 +307,7 @@
 </style>
 <div id="copro-app">
   <div id="copro-stage">
-    <canvas id="copro-canvas" width="700" height="700"></canvas>
+    <canvas id="copro-canvas" width="600" height="600"></canvas>
     <div id="copro-overlay-top">
       <div id="copro-hud">
         <span>Score <strong id="score">0</strong></span>
@@ -338,14 +338,11 @@
 </div>
 <script>
 (function () {
-  // Quick tuning knobs:
-  // - Lower `MOBILE_COLS` => fewer, larger squares on phones.
-  // - Lower `DESKTOP_COLS` => fewer, larger squares on laptops/desktops.
   const IS_COMPACT = window.matchMedia("(max-width: 820px)").matches;
   const IS_TOUCH = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
   const SHOW_DPAD_BY_DEFAULT = IS_COMPACT || IS_TOUCH;
-  const MOBILE_COLS = 14;
-  const DESKTOP_COLS = 20;
+  const MOBILE_COLS = 12;
+  const DESKTOP_COLS = 16;
   const COLS = IS_COMPACT ? MOBILE_COLS : DESKTOP_COLS;
   const ROWS = COLS;
   const CELL = IS_COMPACT ? 34 : 32;
@@ -478,8 +475,7 @@
   const BURST_MS = 4000;
   const BURST_SPEED_MUL = 0.82;
   const BURST_RELEASE_MS = 900;
-  // Includes the collision-rescue tick itself for ~3 total hold ticks.
-  const MOLT_ESCAPE_FREEZE_TICKS = 2;
+  const MOLT_ESCAPE_FREEZE_TICKS = 3; // Includes the collision-rescue tick itself for ~3 total hold ticks.
   const STEP_SFX_VOLUME = 0.01;
   const ROUND_START_DELAY_MS = 3000;
   const MULTI_FOOD_START_LEVEL = 3;
@@ -682,7 +678,7 @@
   function pickSafeStartDir(segments, preferredDir) {
     const candidates = [];
     if (preferredDir) candidates.push(preferredDir);
-    candidates.push(DIRS.R, DIRS.D, DIRS.L, DIRS.U);
+    candidates.push(DIRS.D, DIRS.R, DIRS.L, DIRS.U);
     for (let i = 0; i < candidates.length; i++) {
       const c = candidates[i];
       if (isSafeStartMove(c, segments)) return { x: c.x, y: c.y };
@@ -919,7 +915,7 @@
     roundIntroIsLevelUp = !!isLevelUp;
     roundIntroUntil = Date.now() + ROUND_START_DELAY_MS;
     roundIntroLabel = "Level " + level;
-    setMessage(isLevelUp ? "Round cleared. " + roundIntroLabel + " starts in 3..." : "Get ready. " + roundIntroLabel + " starts in 3...");
+    setMessage(isLevelUp ? "Round cleared. " + roundIntroLabel + " in 3..." : "Get ready. " + roundIntroLabel + " in 3...");
     syncControls();
     draw();
     roundIntroTickId = setInterval(draw, 100);
@@ -1607,7 +1603,7 @@
   }
 
   function spawnParticles(gx, gy) {
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < snake.length; i++) {
       const angle = Math.random() * Math.PI * 2;
       const spd = 1 + Math.random() * 2.4;
       particles.push({
