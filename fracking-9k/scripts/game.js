@@ -166,23 +166,28 @@
     console.warn(`[Launch options] Unknown fullscreen value "${fullscreenQueryRaw}". Valid values: 1|0|toggle.`);
     return 'none';
   })();
-  const nonEuclideanQueryRaw = (urlParams.get('non_euclidean') || urlParams.get('nonEuclidean') || '').trim().toLowerCase();
-  const NON_EUCLIDEAN_QUERY_MODE = (() => {
-    if (!nonEuclideanQueryRaw) return 'auto'; // auto | force | off
-    if (
-      nonEuclideanQueryRaw === 'force' ||
-      nonEuclideanQueryRaw === '1' ||
-      nonEuclideanQueryRaw === 'true' ||
-      nonEuclideanQueryRaw === 'on'
-    ) return 'force';
-    if (
-      nonEuclideanQueryRaw === '0' ||
-      nonEuclideanQueryRaw === 'false' ||
-      nonEuclideanQueryRaw === 'off'
-    ) return 'off';
-    if (nonEuclideanQueryRaw === 'auto') return 'auto';
-    console.warn(`[Launch options] Unknown non_euclidean value "${nonEuclideanQueryRaw}". Valid values: auto|force|off.`);
-    return 'auto';
+  const saucerClassQueryRaw = (urlParams.get('saucer_class') || urlParams.get('saucerClass') || '').trim().toLowerCase();
+  const SAUCER_CLASS_QUERY = (() => {
+    if (!saucerClassQueryRaw) return '';
+    const valid = ['cycle', 'classic', 'sierpinski', 'koch', 'pseudosphere'];
+    if (valid.includes(saucerClassQueryRaw)) return saucerClassQueryRaw;
+    console.warn(`[Launch options] Unknown saucer_class value "${saucerClassQueryRaw}". Valid values: cycle|classic|sierpinski|koch|pseudosphere.`);
+    return '';
+  })();
+  const nonEuclideanQueryRaw = (urlParams.get('non_euclidean') || urlParams.get('nonEuclidean') || '').trim();
+  const nonEuclideanQueryParsed = Number(nonEuclideanQueryRaw);
+  const NON_EUCLIDEAN_FORCED_DURATION_SEC = (() => {
+    if (!nonEuclideanQueryRaw) return 0;
+    if (!Number.isFinite(nonEuclideanQueryParsed) || nonEuclideanQueryParsed <= 0) {
+      console.warn(`[Launch options] Invalid non_euclidean "${nonEuclideanQueryRaw}". Expected positive seconds (for example: non_euclidean=20).`);
+      return 0;
+    }
+    const rounded = Math.round(nonEuclideanQueryParsed);
+    const clamped = Math.max(1, Math.min(600, rounded));
+    if (clamped !== rounded) {
+      console.warn(`[Launch options] non_euclidean "${nonEuclideanQueryParsed}" clamped to "${clamped}" seconds.`);
+    }
+    return clamped;
   })();
   const nonEuclideanEveryQueryRaw = (urlParams.get('non_euclidean_every') || urlParams.get('nonEuclideanEvery') || '').trim();
   const nonEuclideanEveryQueryParsed = Number(nonEuclideanEveryQueryRaw);
@@ -907,7 +912,7 @@
   let activeFractaloidClass = 'mandelbrot';
   let deathLifeSpent = false;
   let nonEuclideanSession = null;
-  let nonEuclideanPendingForce = NON_EUCLIDEAN_QUERY_MODE === 'force';
+  let nonEuclideanPendingForce = NON_EUCLIDEAN_FORCED_DURATION_SEC > 0;
   const perfMetrics = (window.FrackingPerfMetrics && typeof window.FrackingPerfMetrics.create === 'function')
     ? window.FrackingPerfMetrics.create({
         overlayVisible: perfOverlayEnabledByQuery,
@@ -1050,7 +1055,7 @@
   const FRACTALOID_ENHANCED_LIFTMIX = false; // set true to re-enable luma-lift rescue in enhanced mode
   const FRACTALOID_CHROMA_TWEAK = FRACTALOID_COLORIZER_MODE === 'enhanced' ? 1.0 : 0.1; // rescue boosts are enhanced-only
   const FRACTALOID_NEON_TWEAK = FRACTALOID_COLORIZER_MODE === 'enhanced' ? 1.0 : 0.1; // boosted glow path is enhanced-only (temporaraily enabled in classic mode deliberately for testing.)
-  const SAUCER_FRACTAL_CLASS = 'cycle'; // 'cycle' | 'classic' | 'sierpinski' | 'koch' | 'pseudosphere'
+  const SAUCER_FRACTAL_CLASS = SAUCER_CLASS_QUERY || 'cycle'; // 'cycle' | 'classic' | 'sierpinski' | 'koch' | 'pseudosphere'
   const SAUCER_FRACTAL_CLASSES = ['classic', 'sierpinski', 'koch', 'pseudosphere'];
   const shipIconAsset = window.FrackingShipIcon || null;
   const SHIP_ICON_VIEWBOX = shipIconAsset && shipIconAsset.viewBox
@@ -1090,7 +1095,7 @@
   const FRACTAL_DIVE_ZOOM_STEP_OUT = 1.14;
   const FRACTAL_DIVE_MIN_ZOOM = 1e-9;
   const FRACTAL_DIVE_MAX_ZOOM = 12.0;
-  const NON_EUCLIDEAN_ENABLED = NON_EUCLIDEAN_QUERY_MODE !== 'off';
+  const NON_EUCLIDEAN_ENABLED = true;
   const NON_EUCLIDEAN_DEFAULT_DURATION = 24;
   const NON_EUCLIDEAN_SAUCER_HIT_DURATION = 19;
   const NON_EUCLIDEAN_SAUCER_HIT_EXTEND = 10;
@@ -2475,7 +2480,7 @@
     shockwaves = [];
     nonEuclideanSession = null;
     setNonEuclideanUiActive(false);
-    nonEuclideanPendingForce = NON_EUCLIDEAN_QUERY_MODE === 'force';
+    nonEuclideanPendingForce = NON_EUCLIDEAN_FORCED_DURATION_SEC > 0;
     if (fractaloidRuntimeSystem) fractaloidRuntimeSystem.clearDive();
     deathLifeSpent = false;
     inputFeelSystem.reset();
@@ -2494,7 +2499,11 @@
     document.getElementById('hud').classList.remove('hidden');
     spawnWave(wave);
     if (nonEuclideanPendingForce) {
-      const entered = enterNonEuclideanMode({ wave, reason: 'forced-url' });
+      const entered = enterNonEuclideanMode({
+        wave,
+        reason: 'forced-url',
+        durationSec: NON_EUCLIDEAN_FORCED_DURATION_SEC
+      });
       if (entered) nonEuclideanPendingForce = false;
     }
     saucerTimer = Math.max(8, rand(15, 25) / Math.max(0.68, wavePace.saucerCadenceMul || 1));

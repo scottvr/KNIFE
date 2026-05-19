@@ -27,13 +27,13 @@ The mode should deliver a Poincare-disk feel:
 
 ### Slice 1: Mode Scaffolding + Scheduling
 - Add `nonEuclidean` runtime state.
-- Add URL control (`non_euclidean=force|off|on`) for testing.
+- Add URL control (`non_euclidean=<seconds>`) for testing forced entry duration.
 - Add periodic scheduling default: every `2 * class-cycle` waves.
 - Add mode entry/exit helpers and HUD indicator.
 
 Deliverable:
 - mode enters/exits without breaking existing flows,
-- can be forced from URL,
+- can be forced from URL with a numeric duration,
 - periodic trigger wired at wave transition.
 
 ### Slice 2: Geometry Module + Render-Time Projection (No Physics Rewrite)
@@ -77,7 +77,7 @@ Deliverable:
 - Clear player readability that this saucer alters space-time rather than doing direct hull damage.
 
 ## Acceptance Criteria For Slices 1-2
-- `non_euclidean=force` starts mode immediately on game start.
+- `non_euclidean=20` (or any positive seconds value) starts mode immediately on game start.
 - Auto trigger occurs every two class cycles.
 - Mode uses projected rendering in a bounded disk with visible edge.
 - Core game loop remains stable (no collision rewrite yet).
