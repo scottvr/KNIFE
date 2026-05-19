@@ -20,6 +20,9 @@
     const killShip = typeof options.killShip === 'function' ? options.killShip : () => {};
     const resolveSaucerFractalClass = typeof options.resolveSaucerFractalClass === 'function' ? options.resolveSaucerFractalClass : () => 'classic';
     const drawSierpinski = typeof options.drawSierpinski === 'function' ? options.drawSierpinski : () => {};
+    const triggerNonEuclideanFromSaucerHit = typeof options.triggerNonEuclideanFromSaucerHit === 'function'
+      ? options.triggerNonEuclideanFromSaucerHit
+      : () => false;
 
     const sfx = options.sfx || {
       bangLarge: () => {},
@@ -35,6 +38,15 @@
     const SHOCKWAVE_LIFE = options.SHOCKWAVE_LIFE != null ? options.SHOCKWAVE_LIFE : 0.62;
     const SHOCKWAVE_RADIUS_GAIN = options.SHOCKWAVE_RADIUS_GAIN != null ? options.SHOCKWAVE_RADIUS_GAIN : 2.2;
     const SHOCKWAVE_WIDTH = options.SHOCKWAVE_WIDTH != null ? options.SHOCKWAVE_WIDTH : 2.2;
+    const isNonEuclideanActive = typeof options.isNonEuclideanActive === 'function'
+      ? options.isNonEuclideanActive
+      : () => false;
+    const projectPointForRender = typeof options.projectPointForRender === 'function'
+      ? options.projectPointForRender
+      : null;
+    const projectRadiusForRender = typeof options.projectRadiusForRender === 'function'
+      ? options.projectRadiusForRender
+      : null;
 
     function getWidth() { return typeof state.getWidth === 'function' ? state.getWidth() : 0; }
     function getHeight() { return typeof state.getHeight === 'function' ? state.getHeight() : 0; }
@@ -54,6 +66,31 @@
     function getSaucer() { return typeof state.getSaucer === 'function' ? state.getSaucer() : null; }
     function setSaucer(v) { if (typeof state.setSaucer === 'function') state.setSaucer(v); }
 
+    function isCurvatureSaucer(saucerObj) {
+      return !!saucerObj && saucerObj.shapeClass === 'pseudosphere';
+    }
+
+    function projectRenderPoint(x, y, radius = 0) {
+      if (!isNonEuclideanActive() || !projectPointForRender) {
+        return { x, y, scale: 1, hidden: false };
+      }
+      const p = projectPointForRender(x, y, radius) || null;
+      if (!p) return { x, y, scale: 1, hidden: true };
+      const px = Number.isFinite(p.x) ? p.x : x;
+      const py = Number.isFinite(p.y) ? p.y : y;
+      const scale = Number.isFinite(p.scale) ? p.scale : 1;
+      const hidden = p.insideDisk === false || p.hidden === true;
+      return { x: px, y: py, scale, hidden };
+    }
+
+    function projectRenderRadius(radius, scale = 1) {
+      if (!isNonEuclideanActive() || !projectRadiusForRender) {
+        return Math.max(0, radius);
+      }
+      const projected = projectRadiusForRender(radius, scale);
+      return Math.max(0, Number.isFinite(projected) ? projected : radius);
+    }
+
     function checkExtraLife() {
       if (getScore() >= getNextExtraLife()) {
         setLives(getLives() + 1);
@@ -67,6 +104,7 @@
       const isSmall = score > 10000 || Math.random() < Math.min(0.4 + score / 30000, 0.7);
       const cfg = isSmall ? SAUCER_SMALL : SAUCER_LARGE;
       const fromLeft = Math.random() < 0.5;
+      const shapeClass = resolveSaucerFractalClass();
       const saucer = {
         x: fromLeft ? -30 : getWidth() + 30,
         y: rand(60, getHeight() - 60),
@@ -77,7 +115,7 @@
         cfg,
         fireTimer: cfg.fireRate * 0.6,
         directionTimer: rand(1.5, 3),
-        shapeClass: resolveSaucerFractalClass()
+        shapeClass
       };
       setSaucer(saucer);
     }
@@ -95,13 +133,21 @@
       } else {
         angle = Math.random() * Math.PI * 2;
       }
+      const curvatureShot = isCurvatureSaucer(saucer) && Math.random() < (saucer.isSmall ? 0.72 : 0.58);
+      const speedMul = curvatureShot ? 0.62 : 0.85;
+      const radius = curvatureShot ? 4.8 : 1.5;
+      const life = 1.0;
       getSaucerBullets().push({
         x: saucer.x,
         y: saucer.y,
-        vx: Math.cos(angle) * BULLET_SPEED * 0.85,
-        vy: Math.sin(angle) * BULLET_SPEED * 0.85,
-        life: 1.0,
-        r: 1.5
+        vx: Math.cos(angle) * BULLET_SPEED * speedMul,
+        vy: Math.sin(angle) * BULLET_SPEED * speedMul,
+        life,
+        r: radius,
+        maxLife: life,
+        kind: curvatureShot ? 'curvature' : 'normal',
+        saucerClass: saucer.shapeClass || 'classic',
+        warpDurationSec: curvatureShot ? (saucer.isSmall ? 22 : 18) : 0
       });
       sfx.saucerFire();
     }
@@ -188,13 +234,15 @@
       if (!ctx) return;
       const saucer = getSaucer();
       if (!saucer) return;
+      const projected = projectRenderPoint(saucer.x, saucer.y, saucer.r);
+      if (projected.hidden) return;
       ctx.save();
-      ctx.translate(saucer.x, saucer.y);
+      ctx.translate(projected.x, projected.y);
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 1.2;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
-      const r = saucer.r;
+      const r = Math.max(2, projectRenderRadius(saucer.r, projected.scale));
       const saucerClass = saucer.shapeClass || 'classic';
       if (saucerClass === 'sierpinski') {
         const s = r * 1.08;
@@ -224,6 +272,54 @@
           bodyWidthMul: 0.9,
           coreWidthMul: 0.7,
           blur: 2.8
+        });
+      } else if (saucerClass === 'pseudosphere') {
+        const outer = r * 0.92;
+        const arcW = Math.max(0.6, Math.min(1.2, r * 0.05));
+        strokeWithVectorGlow(ctx, () => {
+          ctx.beginPath();
+          ctx.arc(0, 0, outer, 0, Math.PI * 2);
+        }, {
+          baseWidth: arcW,
+          glowQuality: 'low',
+          haloWidthMul: 1.85,
+          haloAlpha: 0.24,
+          bodyWidthMul: 0.9,
+          coreWidthMul: 0.68,
+          blur: 4.8
+        });
+
+        strokeWithVectorGlow(ctx, () => {
+          ctx.beginPath();
+          ctx.moveTo(-outer * 0.78, 0);
+          ctx.quadraticCurveTo(0, -outer * 0.68, outer * 0.78, 0);
+          ctx.moveTo(-outer * 0.78, 0);
+          ctx.quadraticCurveTo(0, outer * 0.68, outer * 0.78, 0);
+          ctx.moveTo(0, -outer * 0.78);
+          ctx.quadraticCurveTo(-outer * 0.68, 0, 0, outer * 0.78);
+          ctx.moveTo(0, -outer * 0.78);
+          ctx.quadraticCurveTo(outer * 0.68, 0, 0, outer * 0.78);
+        }, {
+          baseWidth: arcW * 0.94,
+          glowQuality: 'low',
+          haloWidthMul: 1.7,
+          haloAlpha: 0.22,
+          bodyWidthMul: 0.88,
+          coreWidthMul: 0.62,
+          blur: 4.6
+        });
+
+        strokeWithVectorGlow(ctx, () => {
+          ctx.beginPath();
+          ctx.arc(0, 0, outer * 0.26, 0, Math.PI * 2);
+        }, {
+          baseWidth: arcW * 0.9,
+          glowQuality: 'low',
+          haloWidthMul: 1.5,
+          haloAlpha: 0.2,
+          bodyWidthMul: 0.84,
+          coreWidthMul: 0.6,
+          blur: 3.8
         });
       } else {
         strokeWithVectorGlow(ctx, () => {
@@ -289,6 +385,7 @@
       ctx.lineWidth = width;
       ctx.strokeStyle = `hsl(${38 + w.seed * 84}, 92%, ${62 + harmonicScale * 14}%)`;
       strokeWithVectorGlow(ctx, () => {
+        let started = false;
         ctx.beginPath();
         for (let i = 0; i <= points; i++) {
           const t = i / points;
@@ -296,7 +393,14 @@
           const jitter = 1 + Math.sin(a * 6 + w.phase) * 0.05 + Math.sin(a * 11 + w.seed * 9) * 0.025;
           const x = w.x + Math.cos(a) * radius * jitter;
           const y = w.y + Math.sin(a) * radius * jitter;
-          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          const p = projectRenderPoint(x, y, 0);
+          if (p.hidden) continue;
+          if (!started) {
+            ctx.moveTo(p.x, p.y);
+            started = true;
+          } else {
+            ctx.lineTo(p.x, p.y);
+          }
         }
       }, {
         haloWidthMul: 1.8,
@@ -329,8 +433,11 @@
       if (!ctx) return;
       ctx.fillStyle = '#fff';
       for (const p of getParticles()) {
+        const projected = projectRenderPoint(p.x, p.y, p.size * 0.5);
+        if (projected.hidden) continue;
+        const drawSize = Math.max(0.8, p.size * projected.scale);
         ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
-        ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+        ctx.fillRect(projected.x - drawSize / 2, projected.y - drawSize / 2, drawSize, drawSize);
       }
       ctx.globalAlpha = 1;
     }
@@ -362,6 +469,8 @@
 
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
+        b.prevX = b.x;
+        b.prevY = b.y;
         b.x += b.vx * dt;
         b.y += b.vy * dt;
         b.life -= dt;
@@ -373,6 +482,8 @@
       }
       for (let i = saucerBullets.length - 1; i >= 0; i--) {
         const b = saucerBullets[i];
+        b.prevX = b.x;
+        b.prevY = b.y;
         b.x += b.vx * dt;
         b.y += b.vy * dt;
         b.life -= dt;
@@ -386,12 +497,60 @@
 
     function drawBullets() {
       if (!ctx) return;
+      const nonEuclid = isNonEuclideanActive();
       ctx.fillStyle = '#fff';
-      for (const b of getBullets()) ctx.fillRect(b.x - 1.5, b.y - 1.5, 3, 3);
+      for (const b of getBullets()) {
+        const p = projectRenderPoint(b.x, b.y, b.r || 1.5);
+        if (p.hidden) continue;
+        if (nonEuclid) {
+          const p0 = projectRenderPoint(Number.isFinite(b.prevX) ? b.prevX : b.x, Number.isFinite(b.prevY) ? b.prevY : b.y, b.r || 1.5);
+          if (!p0.hidden) {
+            ctx.strokeStyle = 'rgba(214, 244, 255, 0.58)';
+            ctx.lineWidth = Math.max(0.65, 1.35 * p.scale);
+            ctx.beginPath();
+            ctx.moveTo(p0.x, p0.y);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+          }
+        }
+        const size = Math.max(1.1, 3 * p.scale);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(p.x - size * 0.5, p.y - size * 0.5, size, size);
+      }
       for (const b of getSaucerBullets()) {
-        const t = 1 - b.life;
-        ctx.fillStyle = `hsl(${280 + t * 70}, 95%, ${62 - t * 14}%)`;
-        ctx.fillRect(b.x - 1.9, b.y - 1.9, 3.8, 3.8);
+        const p = projectRenderPoint(b.x, b.y, b.r || 1.9);
+        if (p.hidden) continue;
+        const lifeMax = Number.isFinite(b.maxLife) && b.maxLife > 0 ? b.maxLife : 1;
+        const t = Math.max(0, Math.min(1, 1 - (b.life / lifeMax)));
+        const isCurvature = b.kind === 'curvature';
+        const size = Math.max(
+          isCurvature ? 2.6 : 1.2,
+          (isCurvature ? Math.max(4.6, (b.r || 2) * 1.8) : 3.8) * p.scale
+        );
+        ctx.fillStyle = isCurvature
+          ? `hsla(${188 + t * 28}, 98%, ${66 + t * 8}%, 0.94)`
+          : `hsl(${280 + t * 70}, 95%, ${62 - t * 14}%)`;
+        if (nonEuclid) {
+          const p0 = projectRenderPoint(Number.isFinite(b.prevX) ? b.prevX : b.x, Number.isFinite(b.prevY) ? b.prevY : b.y, b.r || 1.9);
+          if (!p0.hidden) {
+            ctx.strokeStyle = isCurvature
+              ? `hsla(${192 + t * 24}, 98%, ${72 + t * 6}%, 0.62)`
+              : `hsla(${280 + t * 70}, 95%, ${62 - t * 14}%, 0.56)`;
+            ctx.lineWidth = Math.max(isCurvature ? 1.0 : 0.7, (isCurvature ? 2.2 : 1.5) * p.scale);
+            ctx.beginPath();
+            ctx.moveTo(p0.x, p0.y);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+          }
+        }
+        ctx.fillRect(p.x - size * 0.5, p.y - size * 0.5, size, size);
+        if (isCurvature) {
+          ctx.strokeStyle = `hsla(${188 + t * 26}, 100%, ${72 + t * 6}%, 0.84)`;
+          ctx.lineWidth = Math.max(0.6, 1.15 * p.scale);
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, Math.max(1.2, size * 0.72), 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
     }
 
@@ -459,6 +618,17 @@
           const b = saucerBullets[i];
           if (dist2(ship, b) < (ship.r + b.r) * (ship.r + b.r)) {
             saucerBullets.splice(i, 1);
+            if (b.kind === 'curvature' || b.saucerClass === 'pseudosphere') {
+              triggerNonEuclideanFromSaucerHit({
+                reason: 'saucer-hit',
+                durationSec: b.warpDurationSec,
+                originX: ship.x,
+                originY: ship.y
+              });
+              explode(ship.x, ship.y, 10, 0.5);
+              spawnShockwave(ship.x, ship.y, Math.max(ship.r, b.r || 2), (b.life || 0) * 0.37);
+              return;
+            }
             killShip();
             return;
           }

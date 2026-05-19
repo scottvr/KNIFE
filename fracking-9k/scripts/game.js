@@ -19,6 +19,9 @@
   if (!(window.FrackingInput && typeof window.FrackingInput.create === 'function')) {
     noteBootCritical('Input module missing; controls are unavailable.');
   }
+  if (!(window.FrackingNonEuclideanGeometry && typeof window.FrackingNonEuclideanGeometry.create === 'function')) {
+    noteBootWarning('Non-Euclidean geometry module missing; non-Euclidean mode disabled.');
+  }
   if (!(window.FrackingFractaloidPalette && typeof window.FrackingFractaloidPalette.create === 'function')) {
     noteBootWarning('Palette module missing; using simplified palette fallback.');
   }
@@ -162,6 +165,34 @@
     if (fullscreenQueryRaw === 'toggle') return 'toggle';
     console.warn(`[Launch options] Unknown fullscreen value "${fullscreenQueryRaw}". Valid values: 1|0|toggle.`);
     return 'none';
+  })();
+  const nonEuclideanQueryRaw = (urlParams.get('non_euclidean') || urlParams.get('nonEuclidean') || '').trim().toLowerCase();
+  const NON_EUCLIDEAN_QUERY_MODE = (() => {
+    if (!nonEuclideanQueryRaw) return 'auto'; // auto | force | off
+    if (
+      nonEuclideanQueryRaw === 'force' ||
+      nonEuclideanQueryRaw === '1' ||
+      nonEuclideanQueryRaw === 'true' ||
+      nonEuclideanQueryRaw === 'on'
+    ) return 'force';
+    if (
+      nonEuclideanQueryRaw === '0' ||
+      nonEuclideanQueryRaw === 'false' ||
+      nonEuclideanQueryRaw === 'off'
+    ) return 'off';
+    if (nonEuclideanQueryRaw === 'auto') return 'auto';
+    console.warn(`[Launch options] Unknown non_euclidean value "${nonEuclideanQueryRaw}". Valid values: auto|force|off.`);
+    return 'auto';
+  })();
+  const nonEuclideanEveryQueryRaw = (urlParams.get('non_euclidean_every') || urlParams.get('nonEuclideanEvery') || '').trim();
+  const nonEuclideanEveryQueryParsed = Number(nonEuclideanEveryQueryRaw);
+  const NON_EUCLIDEAN_CYCLE_MULTIPLIER = (() => {
+    if (!nonEuclideanEveryQueryRaw) return 2;
+    if (!Number.isFinite(nonEuclideanEveryQueryParsed) || nonEuclideanEveryQueryParsed <= 0) {
+      console.warn(`[Launch options] Invalid non_euclidean_every "${nonEuclideanEveryQueryRaw}". Using default "2".`);
+      return 2;
+    }
+    return Math.max(1, Math.min(12, Math.round(nonEuclideanEveryQueryParsed)));
   })();
   const ARCADE_WIDTH = ARCADE_RES_PRESETS[arcadeResKey].w;
   const ARCADE_HEIGHT = ARCADE_RES_PRESETS[arcadeResKey].h;
@@ -856,7 +887,7 @@
   // ============================================================
   // GAME STATE
   // ============================================================
-  let state = 'title'; // title | playing | dying | wavebreak | gameover | fractaldive
+  let state = 'title'; // title | playing | nonEuclidean | dying | wavebreak | gameover | fractaldive
   let score = 0;
   let lives = 9;
   let wave = 1;
@@ -875,11 +906,15 @@
   let waveProfile = null;
   let activeFractaloidClass = 'mandelbrot';
   let deathLifeSpent = false;
+  let nonEuclideanSession = null;
+  let nonEuclideanPendingForce = NON_EUCLIDEAN_QUERY_MODE === 'force';
   const perfMetrics = (window.FrackingPerfMetrics && typeof window.FrackingPerfMetrics.create === 'function')
     ? window.FrackingPerfMetrics.create({
         overlayVisible: perfOverlayEnabledByQuery,
         metaProvider: () => ({
-          geometryMode: IS_NATIVE_RENDER ? 'locked-native' : 'fixed-world+scaled-display',
+          geometryMode: state === 'nonEuclidean'
+            ? 'poincare-render+euclidean-logic'
+            : (IS_NATIVE_RENDER ? 'locked-native' : 'fixed-world+scaled-display'),
           mode: IS_NATIVE_RENDER ? 'native' : 'arcade_640',
           scaleMode: IS_NATIVE_RENDER ? 'native' : ARCADE_SCALE_MODE,
           glowQuality: ACTIVE_GLOW_QUALITY,
@@ -947,6 +982,13 @@
         compute: () => [],
         draw: () => {}
       };
+  const nonEuclideanGeometry = (window.FrackingNonEuclideanGeometry && typeof window.FrackingNonEuclideanGeometry.create === 'function')
+    ? window.FrackingNonEuclideanGeometry.create({
+        diskFillDefault: 0.46,
+        curvatureMulDefault: 1.0,
+        minScale: 0.025
+      })
+    : null;
   let wavePace = { spawnMul: 1, speedMul: 1, saucerCadenceMul: 1 };
 
   // Tunable constants (classic-ish)
@@ -1008,8 +1050,8 @@
   const FRACTALOID_ENHANCED_LIFTMIX = false; // set true to re-enable luma-lift rescue in enhanced mode
   const FRACTALOID_CHROMA_TWEAK = FRACTALOID_COLORIZER_MODE === 'enhanced' ? 1.0 : 0.1; // rescue boosts are enhanced-only
   const FRACTALOID_NEON_TWEAK = FRACTALOID_COLORIZER_MODE === 'enhanced' ? 1.0 : 0.1; // boosted glow path is enhanced-only (temporaraily enabled in classic mode deliberately for testing.)
-  const SAUCER_FRACTAL_CLASS = 'cycle'; // 'cycle' | 'classic' | 'sierpinski' | 'koch'
-  const SAUCER_FRACTAL_CLASSES = ['classic', 'sierpinski', 'koch'];
+  const SAUCER_FRACTAL_CLASS = 'cycle'; // 'cycle' | 'classic' | 'sierpinski' | 'koch' | 'pseudosphere'
+  const SAUCER_FRACTAL_CLASSES = ['classic', 'sierpinski', 'koch', 'pseudosphere'];
   const shipIconAsset = window.FrackingShipIcon || null;
   const SHIP_ICON_VIEWBOX = shipIconAsset && shipIconAsset.viewBox
     ? shipIconAsset.viewBox
@@ -1048,6 +1090,13 @@
   const FRACTAL_DIVE_ZOOM_STEP_OUT = 1.14;
   const FRACTAL_DIVE_MIN_ZOOM = 1e-9;
   const FRACTAL_DIVE_MAX_ZOOM = 12.0;
+  const NON_EUCLIDEAN_ENABLED = NON_EUCLIDEAN_QUERY_MODE !== 'off';
+  const NON_EUCLIDEAN_DEFAULT_DURATION = 24;
+  const NON_EUCLIDEAN_SAUCER_HIT_DURATION = 19;
+  const NON_EUCLIDEAN_SAUCER_HIT_EXTEND = 10;
+  const NON_EUCLIDEAN_MAX_DURATION = 48;
+  const NON_EUCLIDEAN_DISK_FILL = 0.46;
+  const NON_EUCLIDEAN_CURVATURE_MUL = 1.0;
   fractaloidRuntimeSystem = (window.FrackingFractaloidRuntime && typeof window.FrackingFractaloidRuntime.create === 'function')
     ? window.FrackingFractaloidRuntime.create({
         diveZoomStepIn: FRACTAL_DIVE_ZOOM_STEP_IN,
@@ -1145,6 +1194,10 @@
         killShip,
         resolveSaucerFractalClass,
         drawSierpinski,
+        isNonEuclideanActive: () => hasNonEuclideanMode(),
+        projectPointForRender: (x, y, radius = 0) => projectNonEuclideanPoint(x, y, radius),
+        projectRadiusForRender: (radius, scale = 1) => projectNonEuclideanRadius(radius, scale),
+        triggerNonEuclideanFromSaucerHit: (opts = null) => triggerNonEuclideanFromSaucerHit(opts),
         sfx,
         SAUCER_LARGE,
         SAUCER_SMALL,
@@ -1355,7 +1408,10 @@
       return SAUCER_FRACTAL_CLASS;
     }
     if (SAUCER_FRACTAL_CLASS === 'cycle') {
-      return Math.random() < 0.5 ? 'sierpinski' : 'koch';
+      const warpGate = wave >= 6 ? Math.min(0.34, 0.12 + (wave - 6) * 0.015) : 0;
+      const roll = Math.random();
+      if (roll < warpGate) return 'pseudosphere';
+      return roll < (0.5 + warpGate * 0.5) ? 'sierpinski' : 'koch';
     }
     return 'classic';
   }
@@ -1421,6 +1477,157 @@
       vx: (nx / mag) * targetSpeed,
       vy: (ny / mag) * targetSpeed
     };
+  }
+
+  function hasNonEuclideanMode() {
+    return state === 'nonEuclidean' && !!nonEuclideanSession && !!nonEuclideanGeometry;
+  }
+
+  function nonEuclideanCycleIntervalWaves() {
+    const baseCycle = Math.max(1, FRACTAL_DIVE_AUTO_WAVE_INTERVAL || 1);
+    return Math.max(1, baseCycle * NON_EUCLIDEAN_CYCLE_MULTIPLIER);
+  }
+
+  function shouldAutoEnterNonEuclidean(nextWave) {
+    if (!NON_EUCLIDEAN_ENABLED || !nonEuclideanGeometry) return false;
+    const interval = nonEuclideanCycleIntervalWaves();
+    return nextWave >= interval && (nextWave % interval === 0);
+  }
+
+  function setNonEuclideanUiActive(active) {
+    document.body.classList.toggle('non-euclidean-active', !!active);
+  }
+
+  function currentNonEuclideanView() {
+    if (!nonEuclideanGeometry || !nonEuclideanSession) return null;
+    return nonEuclideanGeometry.resolveView({
+      width: W,
+      height: H,
+      centerX: W * 0.5,
+      centerY: H * 0.5,
+      originX: nonEuclideanSession.originX,
+      originY: nonEuclideanSession.originY,
+      diskFill: NON_EUCLIDEAN_DISK_FILL,
+      curvatureMul: NON_EUCLIDEAN_CURVATURE_MUL
+    });
+  }
+
+  function projectNonEuclideanPoint(x, y, radius = 0) {
+    if (!hasNonEuclideanMode()) {
+      return { x, y, scale: 1, insideDisk: true, hidden: false };
+    }
+    const view = currentNonEuclideanView();
+    if (!view) return { x, y, scale: 1, insideDisk: true, hidden: false };
+    const p = nonEuclideanGeometry.projectPoint(x, y, view);
+    const hidden = p.insideDisk === false;
+    return {
+      x: p.x,
+      y: p.y,
+      scale: p.scale,
+      insideDisk: p.insideDisk,
+      hidden,
+      radius: nonEuclideanGeometry.projectRadius(radius, p.scale)
+    };
+  }
+
+  function projectNonEuclideanRadius(radius, scale = 1) {
+    if (!hasNonEuclideanMode() || !nonEuclideanGeometry) return Math.max(0, radius);
+    return nonEuclideanGeometry.projectRadius(radius, scale);
+  }
+
+  function enterNonEuclideanMode(opts = null) {
+    if (!NON_EUCLIDEAN_ENABLED || !nonEuclideanGeometry) return false;
+    const options = opts || {};
+    const durationSec = Math.max(5, Number.isFinite(options.durationSec) ? options.durationSec : NON_EUCLIDEAN_DEFAULT_DURATION);
+    nonEuclideanSession = {
+      startedAtWave: Number.isFinite(options.wave) ? options.wave : wave,
+      reason: options.reason || 'auto',
+      remaining: durationSec,
+      duration: durationSec,
+      originX: Number.isFinite(options.originX) ? options.originX : W * 0.5,
+      originY: Number.isFinite(options.originY) ? options.originY : H * 0.5
+    };
+    state = 'nonEuclidean';
+    setNonEuclideanUiActive(true);
+    return true;
+  }
+
+  function triggerNonEuclideanFromSaucerHit(opts = null) {
+    if (!NON_EUCLIDEAN_ENABLED || !nonEuclideanGeometry) return false;
+    const options = opts || {};
+    const hitDuration = Math.max(
+      4,
+      Number.isFinite(options.durationSec) ? options.durationSec : NON_EUCLIDEAN_SAUCER_HIT_DURATION
+    );
+    if (hasNonEuclideanMode()) {
+      const extended = Math.min(
+        NON_EUCLIDEAN_MAX_DURATION,
+        nonEuclideanSession.remaining + Math.max(2, NON_EUCLIDEAN_SAUCER_HIT_EXTEND)
+      );
+      nonEuclideanSession.remaining = Math.max(nonEuclideanSession.remaining, extended);
+      nonEuclideanSession.reason = options.reason || 'saucer-hit-extend';
+      return true;
+    }
+    return enterNonEuclideanMode({
+      wave,
+      reason: options.reason || 'saucer-hit',
+      durationSec: hitDuration,
+      originX: Number.isFinite(options.originX) ? options.originX : undefined,
+      originY: Number.isFinite(options.originY) ? options.originY : undefined
+    });
+  }
+
+  function exitNonEuclideanMode() {
+    nonEuclideanSession = null;
+    setNonEuclideanUiActive(false);
+    if (state === 'nonEuclidean') state = 'playing';
+  }
+
+  function updateNonEuclideanMode(dt) {
+    if (!hasNonEuclideanMode()) return;
+    nonEuclideanSession.remaining -= dt;
+    if (nonEuclideanSession.remaining <= 0) {
+      exitNonEuclideanMode();
+    }
+  }
+
+  function drawNonEuclideanOverlay(timeSec) {
+    if (!ctx || !hasNonEuclideanMode()) return;
+    const view = currentNonEuclideanView();
+    if (!view) return;
+    const pulse = 0.72 + 0.28 * Math.sin(timeSec * 2.7);
+
+    ctx.save();
+    // Darken outside the disk so the geometry read is immediate.
+    ctx.fillStyle = 'rgba(4, 8, 14, 0.68)';
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    ctx.arc(view.centerX, view.centerY, view.diskRadius, 0, Math.PI * 2, true);
+    ctx.fill('evenodd');
+
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = `rgba(158, 218, 255, ${0.64 * pulse})`;
+    strokeWithVectorGlow(ctx, () => {
+      ctx.beginPath();
+      ctx.arc(view.centerX, view.centerY, view.diskRadius, 0, Math.PI * 2);
+    }, {
+      haloWidthMul: 1.8,
+      haloAlpha: 0.22,
+      blur: 5.0
+    });
+
+    const interval = nonEuclideanCycleIntervalWaves();
+    const remaining = Math.max(0, nonEuclideanSession.remaining);
+    const seconds = Math.ceil(remaining);
+    const reasonLabel = (nonEuclideanSession.reason || '').startsWith('saucer-hit')
+      ? 'CURVATURE BREACH'
+      : 'NON-EUCLIDEAN DRIFT';
+    ctx.fillStyle = '#d7ecff';
+    ctx.font = '16px \"VT323\", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${reasonLabel} • T-${seconds}s • AUTO EVERY ${interval} WAVES`, 18, 16);
+    ctx.restore();
   }
 
 
@@ -1562,14 +1769,17 @@
       s.blink += 1;
       if (Math.floor(s.blink / 4) % 2 === 0) return;
     }
+    const projected = projectNonEuclideanPoint(s.x, s.y, s.r);
+    if (projected.hidden) return;
+    const shipScale = Math.max(0.18, projected.scale || 1);
     ctx.save();
-    ctx.translate(s.x, s.y);
+    ctx.translate(projected.x, projected.y);
     ctx.rotate(s.angle);
     ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1.3;
+    ctx.lineWidth = Math.max(0.65, 1.3 * shipScale);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    const sz = SHIP_SIZE * 1.08;
+    const sz = SHIP_SIZE * 1.08 * shipScale;
     drawShipHull(sz);
 
     if (getShipFractalClass() !== 'mandelbrot_outline') {
@@ -1673,6 +1883,10 @@
 
   function killShip() {
     if (!ship.alive || ship.invuln > 0) return;
+    if (hasNonEuclideanMode()) {
+      nonEuclideanSession = null;
+      setNonEuclideanUiActive(false);
+    }
     ship.alive = false;
     deathLifeSpent = false;
     funPack.resetChain();
@@ -1985,11 +2199,34 @@
 
   function drawFractaloids(timeSec, warpBullets = []) {
     if (!fractaloidRuntimeSystem) return;
+    let renderFractaloids = fractaloids;
+    let renderWarpBullets = warpBullets;
+    if (hasNonEuclideanMode() && nonEuclideanGeometry) {
+      const view = currentNonEuclideanView();
+      if (view) {
+        renderFractaloids = [];
+        for (const a of fractaloids) {
+          const projected = nonEuclideanGeometry.projectEntity(a, view);
+          if (!projected || projected._outsideDisk) continue;
+          renderFractaloids.push(projected);
+        }
+        renderWarpBullets = [];
+        for (const b of warpBullets) {
+          const p = nonEuclideanGeometry.projectPoint(b.x, b.y, view);
+          if (!p.insideDisk) continue;
+          renderWarpBullets.push({
+            x: p.x,
+            y: p.y,
+            life: b.life
+          });
+        }
+      }
+    }
     fractaloidRuntimeSystem.drawFractaloids({
       ctx,
-      fractaloids,
+      fractaloids: renderFractaloids,
       timeSec,
-      warpBullets,
+      warpBullets: renderWarpBullets,
       dpr: DPR,
       fractalRenderer,
       fractaloidEffects,
@@ -2236,6 +2473,9 @@
     fractaloids = [];
     particles = [];
     shockwaves = [];
+    nonEuclideanSession = null;
+    setNonEuclideanUiActive(false);
+    nonEuclideanPendingForce = NON_EUCLIDEAN_QUERY_MODE === 'force';
     if (fractaloidRuntimeSystem) fractaloidRuntimeSystem.clearDive();
     deathLifeSpent = false;
     inputFeelSystem.reset();
@@ -2253,16 +2493,22 @@
     document.getElementById('gameover-screen').classList.add('hidden');
     document.getElementById('hud').classList.remove('hidden');
     spawnWave(wave);
+    if (nonEuclideanPendingForce) {
+      const entered = enterNonEuclideanMode({ wave, reason: 'forced-url' });
+      if (entered) nonEuclideanPendingForce = false;
+    }
     saucerTimer = Math.max(8, rand(15, 25) / Math.max(0.68, wavePace.saucerCadenceMul || 1));
   }
 
   function endGame() {
     state = 'gameover';
+    nonEuclideanSession = null;
     if (fractaloidRuntimeSystem) fractaloidRuntimeSystem.clearDive();
     deathLifeSpent = false;
     inputFeelSystem.reset();
     activeThreatCues = [];
     setDiveUiActive(false);
+    setNonEuclideanUiActive(false);
     document.body.classList.remove('playing');
     document.getElementById('final-score').textContent = 'SCORE: ' + score.toString().padStart(6, '0');
     document.getElementById('gameover-screen').classList.remove('hidden');
@@ -2372,7 +2618,8 @@
     const classLabel = fractaloidClassLabel(getFractaloidClass());
     const bossLabel = wave % BOSS_WAVE_INTERVAL === 0 ? ' • BOSS' : '';
     const chainLabel = funPack.getChainLabel();
-    document.getElementById('wave').textContent = 'WAVE ' + wave + ' • ' + classLabel + ' • ' + genomeLabel + bossLabel + chainLabel;
+    const nonEuclidLabel = hasNonEuclideanMode() ? ' • NON-EUCLIDEAN' : '';
+    document.getElementById('wave').textContent = 'WAVE ' + wave + ' • ' + classLabel + ' • ' + genomeLabel + bossLabel + chainLabel + nonEuclidLabel;
   }
 
   // ============================================================
@@ -2444,7 +2691,7 @@
     lastTime = now;
     totalTime += dt;
     funPack.tick(dt);
-    inputFeelSystem.tick(dt, { active: state === 'playing' && !!ship && ship.alive });
+    inputFeelSystem.tick(dt, { active: (state === 'playing' || state === 'nonEuclidean') && !!ship && ship.alive });
 
     // clear
     ctx.fillStyle = CRT_CLEAR_COLOR;
@@ -2463,7 +2710,11 @@
       return;
     }
 
-    if (state === 'playing' || state === 'dying' || state === 'wavebreak') {
+    if (state === 'nonEuclidean') {
+      updateNonEuclideanMode(dt);
+    }
+
+    if (state === 'playing' || state === 'nonEuclidean' || state === 'dying' || state === 'wavebreak') {
       // dynamic heartbeat: speeds up as waves escalate and danger increases
       const baseInterval = Math.max(0.52, 1.02 - Math.min(0.44, (wave - 1) * 0.022));
       const minInterval = Math.max(0.14, 0.32 - Math.min(0.14, (wave - 1) * 0.007));
@@ -2479,14 +2730,14 @@
       heartbeatSystem.setIntervalSec(baseInterval - (baseInterval - minInterval) * chaseFactor);
       heartbeatSystem.update(dt, { state, wave });
 
-      if (state === 'playing') {
+      if (state === 'playing' || state === 'nonEuclidean') {
         updateShip(ship, dt);
       }
       // fractaloids and saucer always move
       for (const a of fractaloids) updateFractaloid(a, dt);
 
       saucerTimer -= dt;
-      if (!saucer && saucerTimer <= 0 && state === 'playing') {
+      if (!saucer && saucerTimer <= 0 && (state === 'playing' || state === 'nonEuclidean')) {
         spawnSaucer();
         const cadence = Math.max(0.68, wavePace.saucerCadenceMul || 1);
         saucerTimer = Math.max(5, (rand(20, 35) / cadence) - Math.log2(Math.max(2, wave + 1)) * 1.2);
@@ -2497,7 +2748,7 @@
       updateParticles(dt);
       updateShockwaves(dt);
 
-      if (state === 'playing') checkCollisions();
+      if (state === 'playing' || state === 'nonEuclidean') checkCollisions();
 
       if (state === 'playing' && ship && ship.alive && ship.invuln <= 0) {
         activeThreatCues = threatCueSystem.compute({
@@ -2523,14 +2774,21 @@
           timeSec: totalTime
         });
       }
+      if (state === 'nonEuclidean') {
+        drawNonEuclideanOverlay(totalTime);
+      }
       drawShockwaves();
       drawSaucer();
-      if (state === 'playing') drawShip(ship);
+      if (state === 'playing' || state === 'nonEuclidean') drawShip(ship);
       drawBullets();
       drawParticles();
 
       // wave progression
-      if (state === 'playing' && fractaloids.length === 0) {
+      if ((state === 'playing' || state === 'nonEuclidean') && fractaloids.length === 0) {
+        if (state === 'nonEuclidean') {
+          nonEuclideanSession = null;
+          setNonEuclideanUiActive(false);
+        }
         state = 'wavebreak';
         stateTimer = 2.0;
       }
@@ -2553,9 +2811,14 @@
         ctx.fillText('incoming: ' + nextClass + ' • ' + nextGenome + nextBoss, W/2, H/2 + 20);
         ctx.restore();
         if (stateTimer <= 0) {
-          wave++;
+          const nextWave = wave + 1;
+          wave = nextWave;
           spawnWave(wave);
-          state = 'playing';
+          if (shouldAutoEnterNonEuclidean(nextWave)) {
+            enterNonEuclideanMode({ wave: nextWave, reason: 'scheduled' });
+          } else {
+            state = 'playing';
+          }
         }
       }
 

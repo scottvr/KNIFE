@@ -13,6 +13,8 @@ Open `index.html` in any modern browser. No build step is required; the game run
 - `arcadeRes` / `arcade_res`: `640x480`, `480x640`, `1024x768`, `768x1024`, `1280x960`, `960x1280`
 - `scale_mode` / `scaleMode`: `integer` (pixel-perfect letterbox), `fit` (aspect-safe non-integer fill), `stretch` (full fill, aspect-stretched)
 - `fullscreen`: `1` / `0` / `toggle`
+- `non_euclidean`: `auto` (default), `force`, `off`
+- `non_euclidean_every`: integer multiplier of class-cycle length (default `2`)
 
 ## How to Play
 
