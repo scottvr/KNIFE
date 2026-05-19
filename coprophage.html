@@ -343,6 +343,86 @@
     pointer-events: none;
   }
 
+  #copro-help {
+    position: absolute;
+    z-index: 9;
+    inset: 10px;
+    border-radius: 14px;
+    background: rgba(20, 10, 5, 0.92);
+    border: 1px solid rgba(255, 232, 193, 0.34);
+    color: var(--copro-ink);
+    box-shadow: 0 20px 42px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(4px);
+    overflow: auto;
+    padding: 12px;
+  }
+
+  #copro-help.is-hidden {
+    display: none;
+  }
+
+  #copro-help .help-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+
+  #copro-help h2 {
+    margin: 0;
+    font: 800 24px/1.1 "Trebuchet MS", "Segoe UI", sans-serif;
+    letter-spacing: 0.02em;
+  }
+
+  #copro-help button {
+    border: 1px solid var(--copro-line);
+    color: var(--copro-ink);
+    background: var(--copro-panel);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font: 700 12px/1 "Consolas", "Courier New", monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+  }
+
+  #copro-help .help-copy {
+    margin-top: 8px;
+    font: 700 13px/1.35 "Consolas", "Courier New", monospace;
+    color: var(--copro-muted);
+  }
+
+  #copro-help ul {
+    margin: 8px 0 0;
+    padding-left: 18px;
+  }
+
+  #copro-help li {
+    margin: 4px 0;
+  }
+
+  #copro-help-perks {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+    gap: 7px 10px;
+  }
+
+  .help-perk {
+    border: 1px solid rgba(255, 232, 193, 0.24);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 8px;
+    font: 700 12px/1.25 "Consolas", "Courier New", monospace;
+    color: var(--copro-ink);
+  }
+
+  .help-perk .kicker {
+    color: var(--copro-muted);
+    margin-top: 3px;
+    font-size: 11px;
+  }
+
   @media (max-width: 700px) {
     #copro-stage {
       width: calc(100vw - 8px);
@@ -417,6 +497,10 @@
       width: 38px;
       height: 38px;
     }
+
+    #copro-help-perks {
+      grid-template-columns: 1fr;
+    }
   }
 </style>
 <div id="copro-app">
@@ -434,12 +518,29 @@
         <button id="btn-start" title="Start (Space)">Start</button>
         <button id="btn-pause" title="Pause (Space)">Pause</button>
         <button id="btn-mode" title="Control mode (C)">Mode</button>
+        <button id="btn-help" title="Instructions (H)">How To</button>
         <button id="btn-restart" style="display:none" title="Restart">Reset</button>
       </div>
     </div>
     <div id="copro-msg" aria-live="polite">Press Space to Begin</div>
     <div id="copro-toasts" aria-live="polite" aria-atomic="false"></div>
     <div id="copro-perks" aria-live="polite" aria-atomic="false"></div>
+    <div id="copro-help" class="is-hidden" role="dialog" aria-modal="true" aria-labelledby="copro-help-title">
+      <div class="help-head">
+        <h2 id="copro-help-title">How To Play</h2>
+        <button id="btn-help-close" title="Close instructions">Close</button>
+      </div>
+      <div class="help-copy">
+        <div>Eat dung, grow larva, hit the goal, survive.</div>
+        <ul>
+          <li>Direct mode: arrows/WASD set heading.</li>
+          <li>Steer mode: left/up = turn left, right/down = turn right.</li>
+          <li>Space: start/pause. C: toggle control mode. V: desktop d-pad toggle.</li>
+          <li>Perks auto-trigger when they can save/help you.</li>
+        </ul>
+      </div>
+      <div id="copro-help-perks" aria-live="polite"></div>
+    </div>
     <div class="dpad" aria-label="Direction controls">
       <div class="blank"></div>
       <button data-dir="U" aria-label="Up">▲</button>
@@ -483,9 +584,12 @@
   const msg = document.getElementById("copro-msg");
   const toastHost = document.getElementById("copro-toasts");
   const perkHud = document.getElementById("copro-perks");
+  const helpPanel = document.getElementById("copro-help");
   const btnStart = document.getElementById("btn-start");
   const btnPause = document.getElementById("btn-pause");
   const btnMode = document.getElementById("btn-mode");
+  const btnHelp = document.getElementById("btn-help");
+  const btnHelpClose = document.getElementById("btn-help-close");
   const btnRestart = document.getElementById("btn-restart");
   canvas.width = COLS * CELL;
   canvas.height = ROWS * CELL;
@@ -538,6 +642,11 @@
   let perfectRoundStreak = 0;
   let roundStats = null;
   let burstTimeoutId = null;
+  let helpReturnState = "idle";
+  let perkTutorialTimeoutId = null;
+  let tutorialPerkKey = null;
+  let pendingPerkTutorials = [];
+  let seenPerks = {};
   const perks = {
     gutShield: 0,
     molting: 0,
@@ -600,6 +709,8 @@
   const MOLT_ESCAPE_FREEZE_TICKS = 3; // Includes the collision-rescue tick itself for ~3 total hold ticks.
   const STEP_SFX_VOLUME = 0.01;
   const BEST_SCORE_STORAGE_KEY = "coprophage_best_score_v1";
+  const SEEN_PERKS_STORAGE_KEY = "coprophage_seen_perks_v1";
+  const PERK_TUTORIAL_MS = 2200;
   const ROUND_START_DELAY_MS = 3000;
   const MULTI_FOOD_START_LEVEL = 3;
   const MAX_FOOD_COUNT = 4;
@@ -607,11 +718,11 @@
   const TEMP_FOOD_TTL_DROP_PER_LEVEL = 1;
   const TIMED_ROUTE_SLACK_STEPS = 2;
   const PERK_META = [
-    { key: "gutShield", icon: "🛡", label: "Shield" },
-    { key: "molting", icon: "🪱", label: "Molt" },
-    { key: "acidSpray", icon: "🧪", label: "Acid" },
-    { key: "scentTrail", icon: "👃", label: "Scent" },
-    { key: "digestiveEfficiency", icon: "⚡", label: "Digest" }
+    { key: "gutShield", icon: "🛡", label: "Shield", desc: "Blocks one fatal crash.", tip: "Auto-triggers to prevent death." },
+    { key: "molting", icon: "🪱", label: "Molt", desc: "Sheds a segment to escape danger.", tip: "Creates reaction time and keeps you alive." },
+    { key: "acidSpray", icon: "🧪", label: "Acid", desc: "Lets you phase through your body once.", tip: "Best on tight self-crossings." },
+    { key: "scentTrail", icon: "👃", label: "Scent", desc: "Highlights timed dung priority.", tip: "Helps route oldest timed targets first." },
+    { key: "digestiveEfficiency", icon: "⚡", label: "Digest", desc: "Reduces next round goal requirement.", tip: "Spend it for easier level clears." }
   ];
 
   // Music shape shorthand:
@@ -674,6 +785,140 @@
 
   function setMessage(text) {
     msg.textContent = text;
+  }
+
+  function perkMetaByKey(key) {
+    return PERK_META.find(function (m) { return m.key === key; }) || null;
+  }
+
+  function renderHelpPerks() {
+    const host = document.getElementById("copro-help-perks");
+    if (!host) return;
+    host.textContent = "";
+    PERK_META.forEach(function (meta) {
+      const card = document.createElement("div");
+      card.className = "help-perk";
+      card.innerHTML =
+        "<div>" + meta.icon + " <strong>" + meta.label + "</strong></div>" +
+        "<div>" + meta.desc + "</div>" +
+        '<div class="kicker">' + meta.tip + "</div>";
+      host.appendChild(card);
+    });
+  }
+
+  function loadSeenPerks() {
+    try {
+      const raw = window.localStorage.getItem(SEEN_PERKS_STORAGE_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return {};
+      return parsed;
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function saveSeenPerks() {
+    try {
+      window.localStorage.setItem(SEEN_PERKS_STORAGE_KEY, JSON.stringify(seenPerks));
+    } catch (err) {
+      // Ignore storage failures.
+    }
+  }
+
+  function clearPerkTutorialTimer() {
+    if (!perkTutorialTimeoutId) return;
+    clearTimeout(perkTutorialTimeoutId);
+    perkTutorialTimeoutId = null;
+  }
+
+  function maybeShowQueuedPerkTutorial() {
+    if (gameState !== "running") return;
+    if (perkTutorialTimeoutId || tutorialPerkKey) return;
+    const key = pendingPerkTutorials.shift();
+    if (!key) return;
+    const meta = perkMetaByKey(key);
+    if (!meta) return;
+    tutorialPerkKey = key;
+    stopTickLoop();
+    stopMusic();
+    gameState = "perk_tutorial";
+    setMessage(meta.label + " discovered.");
+    playSfxUi("start");
+    syncControls();
+    draw();
+    perkTutorialTimeoutId = setTimeout(function () {
+      perkTutorialTimeoutId = null;
+      tutorialPerkKey = null;
+      if (gameState !== "perk_tutorial") return;
+      gameState = "running";
+      setMessage("Eat the dung.");
+      startMusic();
+      syncControls();
+      startTickLoop();
+      draw();
+      maybeShowQueuedPerkTutorial();
+    }, PERK_TUTORIAL_MS);
+  }
+
+  function dismissPerkTutorial() {
+    if (gameState !== "perk_tutorial") return;
+    clearPerkTutorialTimer();
+    tutorialPerkKey = null;
+    gameState = "running";
+    setMessage("Eat the dung.");
+    startMusic();
+    syncControls();
+    startTickLoop();
+    draw();
+    maybeShowQueuedPerkTutorial();
+  }
+
+  function openHelpOverlay() {
+    if (!helpPanel || gameState === "help") return;
+    if (gameState === "round_intro") {
+      pushToast("Countdown active. Open help after round starts.", "bad");
+      return;
+    }
+    helpReturnState = gameState;
+    if (gameState === "running") {
+      stopTickLoop();
+      stopMusic();
+    }
+    if (gameState === "perk_tutorial") {
+      helpReturnState = "running";
+      clearPerkTutorialTimer();
+      tutorialPerkKey = null;
+    }
+    gameState = "help";
+    helpPanel.classList.remove("is-hidden");
+    setMessage("Instructions");
+    syncControls();
+    draw();
+  }
+
+  function closeHelpOverlay() {
+    if (!helpPanel || gameState !== "help") return;
+    helpPanel.classList.add("is-hidden");
+    gameState = helpReturnState || "idle";
+    if (gameState === "running") {
+      setMessage("Eat the dung.");
+      startMusic();
+      syncControls();
+      startTickLoop();
+      draw();
+      maybeShowQueuedPerkTutorial();
+      return;
+    }
+    if (gameState === "paused") {
+      setMessage("Paused");
+    } else if (gameState === "idle") {
+      setMessage("Press Space to Begin");
+    } else if (gameState === "dead") {
+      setMessage("You died. Score " + score);
+    }
+    syncControls();
+    draw();
   }
 
   function controlModeLabel(mode) {
@@ -1056,6 +1301,11 @@
     const gained = perks[name] - before;
     if (gained > 0 && toastText) {
       pushToast(toastText + " (" + perks[name] + ")", "level");
+      if (!seenPerks[name]) {
+        seenPerks[name] = true;
+        saveSeenPerks();
+        pendingPerkTutorials.push(name);
+      }
       updateHUD();
     }
   }
@@ -1278,6 +1528,7 @@
       syncControls();
       startTickLoop();
       draw();
+      maybeShowQueuedPerkTutorial();
     }, ROUND_START_DELAY_MS);
   }
 
@@ -1740,7 +1991,9 @@
   function init() {
     clearRoundIntroTimers();
     clearBurstTimer();
+    clearPerkTutorialTimer();
     stopMusic();
+    if (helpPanel) helpPanel.classList.add("is-hidden");
     effects.burstUntil = 0;
     effects.burstReleaseUntil = 0;
     effects.scentTrailUntil = 0;
@@ -1750,6 +2003,10 @@
     perks.acidSpray = 0;
     perks.scentTrail = 0;
     perks.digestiveEfficiency = 0;
+    pendingPerkTutorials = [];
+    tutorialPerkKey = null;
+    seenPerks = loadSeenPerks();
+    renderHelpPerks();
     perfectRoundStreak = 0;
     best = loadBestScore();
     score = 0;
@@ -1839,7 +2096,10 @@
     btnRestart.style.display = gameState === "idle" ? "none" : "inline-flex";
     btnPause.textContent = gameState === "paused" ? "Resume" : "Pause";
     btnStart.textContent = "Start";
-    btnStart.disabled = gameState === "running" || gameState === "round_intro";
+    btnStart.disabled = gameState === "running" || gameState === "round_intro" || gameState === "perk_tutorial" || gameState === "help";
+    btnPause.disabled = gameState === "help" || gameState === "perk_tutorial";
+    btnMode.disabled = gameState === "help";
+    btnHelp.textContent = gameState === "help" ? "Close" : "How To";
   }
 
   function speedForLevel(lvl) {
@@ -1850,7 +2110,9 @@
     stopTickLoop();
     clearRoundIntroTimers();
     clearBurstTimer();
+    clearPerkTutorialTimer();
     stopMusic();
+    if (helpPanel) helpPanel.classList.add("is-hidden");
     effects.burstUntil = 0;
     effects.burstReleaseUntil = 0;
     effects.scentTrailUntil = 0;
@@ -1860,6 +2122,8 @@
     perks.acidSpray = 0;
     perks.scentTrail = 0;
     perks.digestiveEfficiency = 0;
+    pendingPerkTutorials = [];
+    tutorialPerkKey = null;
     perfectRoundStreak = 0;
     musicStep = 0;
     score = 0;
@@ -1893,6 +2157,7 @@
       startMusic();
       syncControls();
       startTickLoop();
+      maybeShowQueuedPerkTutorial();
     }
   }
 
@@ -2083,6 +2348,7 @@
     stopTickLoop();
     clearRoundIntroTimers();
     clearBurstTimer();
+    clearPerkTutorialTimer();
     stopMusic();
     playSfxDeath();
     updateBestIfHigher(score);
@@ -2368,6 +2634,47 @@
     ctx.fillText("PAUSED", canvas.width / 2, midY);
   }
 
+  function drawPerkTutorialOverlay() {
+    if (!tutorialPerkKey) return;
+    const meta = perkMetaByKey(tutorialPerkKey);
+    if (!meta) return;
+    const panelW = Math.min(canvas.width * 0.78, 520);
+    const panelH = Math.min(canvas.height * 0.5, 300);
+    const x = (canvas.width - panelW) / 2;
+    const y = PLAY_TOP + (PLAY_HEIGHT - panelH) / 2;
+    ctx.fillStyle = "rgba(20, 10, 5, 0.76)";
+    ctx.fillRect(0, PLAY_TOP, canvas.width, PLAY_HEIGHT);
+    ctx.fillStyle = "rgba(32, 14, 7, 0.96)";
+    ctx.strokeStyle = "rgba(255, 232, 193, 0.42)";
+    ctx.lineWidth = 2;
+    if (typeof ctx.roundRect === "function") {
+      ctx.beginPath();
+      ctx.roundRect(x, y, panelW, panelH, 14);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillRect(x, y, panelW, panelH);
+      ctx.strokeRect(x, y, panelW, panelH);
+    }
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = PALETTE.textDim;
+    ctx.font = "bold 17px Consolas, monospace";
+    ctx.fillText("NEW PERK DISCOVERED", canvas.width / 2, y + 34);
+    ctx.font = "bold 54px serif";
+    ctx.fillText(meta.icon, canvas.width / 2, y + 88);
+    ctx.fillStyle = PALETTE.text;
+    ctx.font = "bold 34px Trebuchet MS, sans-serif";
+    ctx.fillText(meta.label, canvas.width / 2, y + 138);
+    ctx.fillStyle = PALETTE.textDim;
+    ctx.font = "bold 17px Consolas, monospace";
+    ctx.fillText(meta.desc, canvas.width / 2, y + 178);
+    ctx.fillText(meta.tip, canvas.width / 2, y + 208);
+    ctx.fillStyle = "rgba(255, 232, 193, 0.85)";
+    ctx.font = "bold 14px Consolas, monospace";
+    ctx.fillText("Auto-resuming...", canvas.width / 2, y + panelH - 24);
+  }
+
   function drawRoundIntroOverlay() {
     const now = Date.now();
     const seconds = Math.max(1, Math.ceil((roundIntroUntil - now) / 1000));
@@ -2396,12 +2703,20 @@
     drawParticles();
     if (gameState === "paused") drawPauseOverlay();
     if (gameState === "round_intro") drawRoundIntroOverlay();
+    if (gameState === "perk_tutorial") drawPerkTutorialOverlay();
   }
 
   btnStart.addEventListener("click", startGame);
   btnPause.addEventListener("click", pauseGame);
   btnMode.addEventListener("click", function () {
     cycleControlMode(true);
+  });
+  btnHelp.addEventListener("click", function () {
+    if (gameState === "help") closeHelpOverlay();
+    else openHelpOverlay();
+  });
+  btnHelpClose.addEventListener("click", function () {
+    closeHelpOverlay();
   });
   btnRestart.addEventListener("click", function () {
     resetGame();
@@ -2449,6 +2764,25 @@
 
   document.addEventListener("keydown", function (e) {
     ensureAudio();
+    if (gameState === "help") {
+      if (e.key === "Escape" || (e.key && e.key.toLowerCase() === "h")) {
+        e.preventDefault();
+        closeHelpOverlay();
+      }
+      return;
+    }
+    if (gameState === "perk_tutorial") {
+      if (e.code === "Space" || e.key === "Enter") {
+        e.preventDefault();
+        dismissPerkTutorial();
+      }
+      return;
+    }
+    if (e.key && e.key.toLowerCase() === "h") {
+      e.preventDefault();
+      openHelpOverlay();
+      return;
+    }
     if (e.key === "1") {
       e.preventDefault();
       setControlMode("direct", true);
