@@ -52,10 +52,19 @@ Deliverable:
 - Create dedicated runtime module (`non-euclidean-runtime.js`) to own mode lifecycle, scoring hooks, and timers.
 - Reduce `game.js` orchestration burden.
 
+Deliverable:
+- `scripts/non-euclidean-runtime.js` owns non-Euclidean session lifecycle, forced-start handling, auto-entry checks, and overlay timing.
+- `game.js` uses runtime-backed wrappers/callbacks rather than managing raw non-Euclidean session objects directly.
+
 ### Slice 4: Anchored-Ship Semantics
 - Keep ship centered in disk.
 - Apply inverse movement to universe entities.
 - Replace/disable wrap behavior for this mode with far-field culling.
+
+Deliverable:
+- Ship remains anchored at disk center throughout non-Euclidean play.
+- Player thrust translates the universe in the opposite direction (relative-motion semantics).
+- Wraparound is disabled for non-Euclidean updates and replaced by far-field despawn/culling.
 
 ### Slice 5: Geodesic UX and Aiming Feel
 - Improve projectile readability (arc trails, lead cues, optional teaching prompts).

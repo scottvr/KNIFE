@@ -911,8 +911,6 @@
   let waveProfile = null;
   let activeFractaloidClass = 'mandelbrot';
   let deathLifeSpent = false;
-  let nonEuclideanSession = null;
-  let nonEuclideanPendingForce = NON_EUCLIDEAN_FORCED_DURATION_SEC > 0;
   const perfMetrics = (window.FrackingPerfMetrics && typeof window.FrackingPerfMetrics.create === 'function')
     ? window.FrackingPerfMetrics.create({
         overlayVisible: perfOverlayEnabledByQuery,
@@ -1102,6 +1100,41 @@
   const NON_EUCLIDEAN_MAX_DURATION = 48;
   const NON_EUCLIDEAN_DISK_FILL = 0.46;
   const NON_EUCLIDEAN_CURVATURE_MUL = 1.0;
+  const NON_EUCLIDEAN_FAR_FIELD_RADIUS_MUL = 8.0;
+  const nonEuclideanRuntime = (window.FrackingNonEuclideanRuntime && typeof window.FrackingNonEuclideanRuntime.create === 'function')
+    ? window.FrackingNonEuclideanRuntime.create({
+        geometry: nonEuclideanGeometry,
+        enabled: NON_EUCLIDEAN_ENABLED,
+        defaultDuration: NON_EUCLIDEAN_DEFAULT_DURATION,
+        saucerHitDuration: NON_EUCLIDEAN_SAUCER_HIT_DURATION,
+        saucerHitExtend: NON_EUCLIDEAN_SAUCER_HIT_EXTEND,
+        maxDuration: NON_EUCLIDEAN_MAX_DURATION,
+        forcedDurationSec: NON_EUCLIDEAN_FORCED_DURATION_SEC,
+        diskFill: NON_EUCLIDEAN_DISK_FILL,
+        curvatureMul: NON_EUCLIDEAN_CURVATURE_MUL,
+        cycleMultiplier: NON_EUCLIDEAN_CYCLE_MULTIPLIER,
+        autoBaseCycleInterval: FRACTAL_DIVE_AUTO_WAVE_INTERVAL,
+        onUiActiveChange: (active) => setNonEuclideanUiActive(active)
+      })
+    : {
+        isReady: () => false,
+        isActive: () => false,
+        cycleIntervalWaves: () => 1,
+        shouldAutoEnter: () => false,
+        resolveView: () => null,
+        projectPoint: (x, y, radius = 0) => ({ x, y, scale: 1, insideDisk: true, hidden: false, radius: Math.max(0, radius) }),
+        projectRadius: (radius) => Math.max(0, radius),
+        projectEntity: (entity) => (entity ? Object.assign({}, entity) : null),
+        enter: () => false,
+        triggerSaucerHit: () => false,
+        exit: () => false,
+        clear: () => false,
+        tick: () => ({ expired: false, remaining: 0 }),
+        resetForRun: () => {},
+        startForcedIfPending: () => false,
+        hasPendingForce: () => false,
+        drawOverlay: () => false
+      };
   fractaloidRuntimeSystem = (window.FrackingFractaloidRuntime && typeof window.FrackingFractaloidRuntime.create === 'function')
     ? window.FrackingFractaloidRuntime.create({
         diveZoomStepIn: FRACTAL_DIVE_ZOOM_STEP_IN,
@@ -1485,18 +1518,11 @@
   }
 
   function hasNonEuclideanMode() {
-    return state === 'nonEuclidean' && !!nonEuclideanSession && !!nonEuclideanGeometry;
-  }
-
-  function nonEuclideanCycleIntervalWaves() {
-    const baseCycle = Math.max(1, FRACTAL_DIVE_AUTO_WAVE_INTERVAL || 1);
-    return Math.max(1, baseCycle * NON_EUCLIDEAN_CYCLE_MULTIPLIER);
+    return state === 'nonEuclidean' && nonEuclideanRuntime.isActive();
   }
 
   function shouldAutoEnterNonEuclidean(nextWave) {
-    if (!NON_EUCLIDEAN_ENABLED || !nonEuclideanGeometry) return false;
-    const interval = nonEuclideanCycleIntervalWaves();
-    return nextWave >= interval && (nextWave % interval === 0);
+    return nonEuclideanRuntime.shouldAutoEnter(nextWave);
   }
 
   function setNonEuclideanUiActive(active) {
@@ -1504,135 +1530,156 @@
   }
 
   function currentNonEuclideanView() {
-    if (!nonEuclideanGeometry || !nonEuclideanSession) return null;
-    return nonEuclideanGeometry.resolveView({
+    return nonEuclideanRuntime.resolveView({
       width: W,
       height: H,
       centerX: W * 0.5,
-      centerY: H * 0.5,
-      originX: nonEuclideanSession.originX,
-      originY: nonEuclideanSession.originY,
-      diskFill: NON_EUCLIDEAN_DISK_FILL,
-      curvatureMul: NON_EUCLIDEAN_CURVATURE_MUL
+      centerY: H * 0.5
     });
   }
 
   function projectNonEuclideanPoint(x, y, radius = 0) {
-    if (!hasNonEuclideanMode()) {
-      return { x, y, scale: 1, insideDisk: true, hidden: false };
-    }
-    const view = currentNonEuclideanView();
-    if (!view) return { x, y, scale: 1, insideDisk: true, hidden: false };
-    const p = nonEuclideanGeometry.projectPoint(x, y, view);
-    const hidden = p.insideDisk === false;
-    return {
-      x: p.x,
-      y: p.y,
-      scale: p.scale,
-      insideDisk: p.insideDisk,
-      hidden,
-      radius: nonEuclideanGeometry.projectRadius(radius, p.scale)
-    };
-  }
-
-  function projectNonEuclideanRadius(radius, scale = 1) {
-    if (!hasNonEuclideanMode() || !nonEuclideanGeometry) return Math.max(0, radius);
-    return nonEuclideanGeometry.projectRadius(radius, scale);
-  }
-
-  function enterNonEuclideanMode(opts = null) {
-    if (!NON_EUCLIDEAN_ENABLED || !nonEuclideanGeometry) return false;
-    const options = opts || {};
-    const durationSec = Math.max(5, Number.isFinite(options.durationSec) ? options.durationSec : NON_EUCLIDEAN_DEFAULT_DURATION);
-    nonEuclideanSession = {
-      startedAtWave: Number.isFinite(options.wave) ? options.wave : wave,
-      reason: options.reason || 'auto',
-      remaining: durationSec,
-      duration: durationSec,
-      originX: Number.isFinite(options.originX) ? options.originX : W * 0.5,
-      originY: Number.isFinite(options.originY) ? options.originY : H * 0.5
-    };
-    state = 'nonEuclidean';
-    setNonEuclideanUiActive(true);
-    return true;
-  }
-
-  function triggerNonEuclideanFromSaucerHit(opts = null) {
-    if (!NON_EUCLIDEAN_ENABLED || !nonEuclideanGeometry) return false;
-    const options = opts || {};
-    const hitDuration = Math.max(
-      4,
-      Number.isFinite(options.durationSec) ? options.durationSec : NON_EUCLIDEAN_SAUCER_HIT_DURATION
-    );
-    if (hasNonEuclideanMode()) {
-      const extended = Math.min(
-        NON_EUCLIDEAN_MAX_DURATION,
-        nonEuclideanSession.remaining + Math.max(2, NON_EUCLIDEAN_SAUCER_HIT_EXTEND)
-      );
-      nonEuclideanSession.remaining = Math.max(nonEuclideanSession.remaining, extended);
-      nonEuclideanSession.reason = options.reason || 'saucer-hit-extend';
-      return true;
-    }
-    return enterNonEuclideanMode({
-      wave,
-      reason: options.reason || 'saucer-hit',
-      durationSec: hitDuration,
-      originX: Number.isFinite(options.originX) ? options.originX : undefined,
-      originY: Number.isFinite(options.originY) ? options.originY : undefined
+    return nonEuclideanRuntime.projectPoint(x, y, radius, {
+      width: W,
+      height: H,
+      centerX: W * 0.5,
+      centerY: H * 0.5
     });
   }
 
-  function exitNonEuclideanMode() {
-    nonEuclideanSession = null;
-    setNonEuclideanUiActive(false);
-    if (state === 'nonEuclidean') state = 'playing';
+  function projectNonEuclideanRadius(radius, scale = 1) {
+    return nonEuclideanRuntime.projectRadius(radius, scale);
+  }
+
+  function enterNonEuclideanMode(opts = null) {
+    const options = opts || {};
+    const centerX = W * 0.5;
+    const centerY = H * 0.5;
+    const entered = nonEuclideanRuntime.enter({
+      wave: Number.isFinite(options.wave) ? options.wave : wave,
+      reason: options.reason,
+      durationSec: options.durationSec,
+      originX: centerX,
+      originY: centerY
+    });
+    if (entered) {
+      state = 'nonEuclidean';
+      if (ship && ship.alive) anchorShipToNonEuclideanCenter(ship);
+    }
+    return entered;
+  }
+
+  function triggerNonEuclideanFromSaucerHit(opts = null) {
+    const options = opts || {};
+    const centerX = W * 0.5;
+    const centerY = H * 0.5;
+    const triggered = nonEuclideanRuntime.triggerSaucerHit({
+      wave,
+      reason: options.reason,
+      durationSec: options.durationSec,
+      originX: centerX,
+      originY: centerY
+    });
+    if (triggered) {
+      state = 'nonEuclidean';
+      if (ship && ship.alive) anchorShipToNonEuclideanCenter(ship);
+    }
+    return triggered;
   }
 
   function updateNonEuclideanMode(dt) {
     if (!hasNonEuclideanMode()) return;
-    nonEuclideanSession.remaining -= dt;
-    if (nonEuclideanSession.remaining <= 0) {
-      exitNonEuclideanMode();
-    }
+    const tick = nonEuclideanRuntime.tick(dt);
+    if (tick.expired && state === 'nonEuclidean') state = 'playing';
   }
 
   function drawNonEuclideanOverlay(timeSec) {
     if (!ctx || !hasNonEuclideanMode()) return;
-    const view = currentNonEuclideanView();
-    if (!view) return;
-    const pulse = 0.72 + 0.28 * Math.sin(timeSec * 2.7);
-
-    ctx.save();
-    // Darken outside the disk so the geometry read is immediate.
-    ctx.fillStyle = 'rgba(4, 8, 14, 0.68)';
-    ctx.beginPath();
-    ctx.rect(0, 0, W, H);
-    ctx.arc(view.centerX, view.centerY, view.diskRadius, 0, Math.PI * 2, true);
-    ctx.fill('evenodd');
-
-    ctx.lineWidth = 1.6;
-    ctx.strokeStyle = `rgba(158, 218, 255, ${0.64 * pulse})`;
-    strokeWithVectorGlow(ctx, () => {
-      ctx.beginPath();
-      ctx.arc(view.centerX, view.centerY, view.diskRadius, 0, Math.PI * 2);
-    }, {
-      haloWidthMul: 1.8,
-      haloAlpha: 0.22,
-      blur: 5.0
+    nonEuclideanRuntime.drawOverlay({
+      ctx,
+      width: W,
+      height: H,
+      centerX: W * 0.5,
+      centerY: H * 0.5,
+      timeSec,
+      strokeWithVectorGlow
     });
+  }
 
-    const interval = nonEuclideanCycleIntervalWaves();
-    const remaining = Math.max(0, nonEuclideanSession.remaining);
-    const seconds = Math.ceil(remaining);
-    const reasonLabel = (nonEuclideanSession.reason || '').startsWith('saucer-hit')
-      ? 'CURVATURE BREACH'
-      : 'NON-EUCLIDEAN DRIFT';
-    ctx.fillStyle = '#d7ecff';
-    ctx.font = '16px \"VT323\", monospace';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(`${reasonLabel} • T-${seconds}s • AUTO EVERY ${interval} WAVES`, 18, 16);
-    ctx.restore();
+  function translateUniverse(dx, dy) {
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
+    if (Math.abs(dx) + Math.abs(dy) < 1e-8) return;
+
+    for (const a of fractaloids) {
+      a.x += dx;
+      a.y += dy;
+    }
+    for (const b of bullets) {
+      b.x += dx;
+      b.y += dy;
+      if (Number.isFinite(b.prevX)) b.prevX += dx;
+      if (Number.isFinite(b.prevY)) b.prevY += dy;
+    }
+    for (const b of saucerBullets) {
+      b.x += dx;
+      b.y += dy;
+      if (Number.isFinite(b.prevX)) b.prevX += dx;
+      if (Number.isFinite(b.prevY)) b.prevY += dy;
+    }
+    for (const p of particles) {
+      p.x += dx;
+      p.y += dy;
+    }
+    for (const wv of shockwaves) {
+      wv.x += dx;
+      wv.y += dy;
+    }
+    if (saucer) {
+      saucer.x += dx;
+      saucer.y += dy;
+    }
+  }
+
+  function anchorShipToNonEuclideanCenter(s) {
+    if (!s) return;
+    const cx = W * 0.5;
+    const cy = H * 0.5;
+    const shiftX = cx - s.x;
+    const shiftY = cy - s.y;
+    if (Math.abs(shiftX) + Math.abs(shiftY) > 1e-7) {
+      translateUniverse(shiftX, shiftY);
+    }
+    s.x = cx;
+    s.y = cy;
+  }
+
+  function isOutsideNonEuclideanFarField(obj, pad = 0) {
+    if (!obj) return false;
+    const cx = W * 0.5;
+    const cy = H * 0.5;
+    const rr = Math.max(24, Math.max(W, H) * NON_EUCLIDEAN_FAR_FIELD_RADIUS_MUL + Math.max(0, pad));
+    const dx = (Number.isFinite(obj.x) ? obj.x : cx) - cx;
+    const dy = (Number.isFinite(obj.y) ? obj.y : cy) - cy;
+    return (dx * dx + dy * dy) > rr * rr;
+  }
+
+  function cullNonEuclideanFarField() {
+    if (!hasNonEuclideanMode()) return;
+    for (let i = fractaloids.length - 1; i >= 0; i--) {
+      const a = fractaloids[i];
+      if (isOutsideNonEuclideanFarField(a, (a.r || 0) + 260)) fractaloids.splice(i, 1);
+    }
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      if (isOutsideNonEuclideanFarField(p, 120)) particles.splice(i, 1);
+    }
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+      const wv = shockwaves[i];
+      if (isOutsideNonEuclideanFarField(wv, (wv.r1 || 0) + 200)) shockwaves.splice(i, 1);
+    }
+    if (saucer && isOutsideNonEuclideanFarField(saucer, (saucer.r || 0) + 260)) {
+      saucer = null;
+    }
   }
 
 
@@ -1819,6 +1866,8 @@
   function updateShip(s, dt) {
     if (!s.alive) return;
     const intents = inputFeelSystem.getIntents();
+    const prevX = s.x;
+    const prevY = s.y;
     if (s.invuln > 0) s.invuln -= dt;
 
     if (keys.left) s.angle -= SHIP_TURN * dt;
@@ -1844,7 +1893,18 @@
 
     s.x += s.vx * dt;
     s.y += s.vy * dt;
-    wrap(s);
+    if (hasNonEuclideanMode()) {
+      const dx = s.x - prevX;
+      const dy = s.y - prevY;
+      if (Math.abs(dx) + Math.abs(dy) > 1e-8) {
+        translateUniverse(-dx, -dy);
+      }
+      s.x = prevX;
+      s.y = prevY;
+      anchorShipToNonEuclideanCenter(s);
+    } else {
+      wrap(s);
+    }
 
     s.fireTimer -= dt;
     if (!intents.fire && s.fireTimer <= FIRE_COOLDOWN_BASE) {
@@ -1880,8 +1940,17 @@
       killShip();
       return;
     }
-    s.x = rand(40, W-40);
-    s.y = rand(40, H-40);
+    const targetX = rand(40, W - 40);
+    const targetY = rand(40, H - 40);
+    if (hasNonEuclideanMode()) {
+      const dx = s.x - targetX;
+      const dy = s.y - targetY;
+      translateUniverse(dx, dy);
+      anchorShipToNonEuclideanCenter(s);
+    } else {
+      s.x = targetX;
+      s.y = targetY;
+    }
     s.vx = 0; s.vy = 0;
     s.invuln = 0.5;
   }
@@ -1889,8 +1958,7 @@
   function killShip() {
     if (!ship.alive || ship.invuln > 0) return;
     if (hasNonEuclideanMode()) {
-      nonEuclideanSession = null;
-      setNonEuclideanUiActive(false);
+      nonEuclideanRuntime.clear();
     }
     ship.alive = false;
     deathLifeSpent = false;
@@ -2206,18 +2274,18 @@
     if (!fractaloidRuntimeSystem) return;
     let renderFractaloids = fractaloids;
     let renderWarpBullets = warpBullets;
-    if (hasNonEuclideanMode() && nonEuclideanGeometry) {
+    if (hasNonEuclideanMode()) {
       const view = currentNonEuclideanView();
       if (view) {
         renderFractaloids = [];
         for (const a of fractaloids) {
-          const projected = nonEuclideanGeometry.projectEntity(a, view);
+          const projected = nonEuclideanRuntime.projectEntity(a, view);
           if (!projected || projected._outsideDisk) continue;
           renderFractaloids.push(projected);
         }
         renderWarpBullets = [];
         for (const b of warpBullets) {
-          const p = nonEuclideanGeometry.projectPoint(b.x, b.y, view);
+          const p = nonEuclideanRuntime.projectPoint(b.x, b.y, 0, view);
           if (!p.insideDisk) continue;
           renderWarpBullets.push({
             x: p.x,
@@ -2246,7 +2314,8 @@
 
   function updateFractaloid(a, dt) {
     if (!fractaloidRuntimeSystem) return;
-    fractaloidRuntimeSystem.updateFractaloid(a, dt, { wrap, isJuliaMode, fract });
+    const wrapFn = hasNonEuclideanMode() ? (() => {}) : wrap;
+    fractaloidRuntimeSystem.updateFractaloid(a, dt, { wrap: wrapFn, isJuliaMode, fract });
   }
 
   function clampDiveZoom(v) {
@@ -2478,9 +2547,7 @@
     fractaloids = [];
     particles = [];
     shockwaves = [];
-    nonEuclideanSession = null;
-    setNonEuclideanUiActive(false);
-    nonEuclideanPendingForce = NON_EUCLIDEAN_FORCED_DURATION_SEC > 0;
+    nonEuclideanRuntime.resetForRun();
     if (fractaloidRuntimeSystem) fractaloidRuntimeSystem.clearDive();
     deathLifeSpent = false;
     inputFeelSystem.reset();
@@ -2498,26 +2565,25 @@
     document.getElementById('gameover-screen').classList.add('hidden');
     document.getElementById('hud').classList.remove('hidden');
     spawnWave(wave);
-    if (nonEuclideanPendingForce) {
-      const entered = enterNonEuclideanMode({
+    if (nonEuclideanRuntime.startForcedIfPending({
         wave,
-        reason: 'forced-url',
-        durationSec: NON_EUCLIDEAN_FORCED_DURATION_SEC
-      });
-      if (entered) nonEuclideanPendingForce = false;
+        originX: W * 0.5,
+        originY: H * 0.5
+      })) {
+      state = 'nonEuclidean';
+      if (ship && ship.alive) anchorShipToNonEuclideanCenter(ship);
     }
     saucerTimer = Math.max(8, rand(15, 25) / Math.max(0.68, wavePace.saucerCadenceMul || 1));
   }
 
   function endGame() {
     state = 'gameover';
-    nonEuclideanSession = null;
+    nonEuclideanRuntime.clear();
     if (fractaloidRuntimeSystem) fractaloidRuntimeSystem.clearDive();
     deathLifeSpent = false;
     inputFeelSystem.reset();
     activeThreatCues = [];
     setDiveUiActive(false);
-    setNonEuclideanUiActive(false);
     document.body.classList.remove('playing');
     document.getElementById('final-score').textContent = 'SCORE: ' + score.toString().padStart(6, '0');
     document.getElementById('gameover-screen').classList.remove('hidden');
@@ -2756,6 +2822,9 @@
       updateBullets(dt);
       updateParticles(dt);
       updateShockwaves(dt);
+      if (state === 'nonEuclidean') {
+        cullNonEuclideanFarField();
+      }
 
       if (state === 'playing' || state === 'nonEuclidean') checkCollisions();
 
@@ -2795,8 +2864,7 @@
       // wave progression
       if ((state === 'playing' || state === 'nonEuclidean') && fractaloids.length === 0) {
         if (state === 'nonEuclidean') {
-          nonEuclideanSession = null;
-          setNonEuclideanUiActive(false);
+          nonEuclideanRuntime.clear();
         }
         state = 'wavebreak';
         stateTimer = 2.0;

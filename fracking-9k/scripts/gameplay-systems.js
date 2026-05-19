@@ -91,6 +91,21 @@
       return Math.max(0, Number.isFinite(projected) ? projected : radius);
     }
 
+    function nonEuclideanFarFieldRadius(extra = 0) {
+      const base = Math.max(getWidth(), getHeight()) * 8.0;
+      return Math.max(24, base + Math.max(0, extra));
+    }
+
+    function isOutsideNonEuclideanFarField(obj, extra = 0) {
+      if (!isNonEuclideanActive() || !obj) return false;
+      const cx = getWidth() * 0.5;
+      const cy = getHeight() * 0.5;
+      const dx = (Number.isFinite(obj.x) ? obj.x : cx) - cx;
+      const dy = (Number.isFinite(obj.y) ? obj.y : cy) - cy;
+      const rr = nonEuclideanFarFieldRadius(extra);
+      return (dx * dx + dy * dy) > rr * rr;
+    }
+
     function checkExtraLife() {
       if (getScore() >= getNextExtraLife()) {
         setLives(getLives() + 1);
@@ -155,6 +170,7 @@
     function updateSaucer(dt) {
       const saucer = getSaucer();
       if (!saucer) return;
+      const nonEuclid = isNonEuclideanActive();
 
       saucer.x += saucer.vx * dt;
       saucer.y += saucer.vy * dt;
@@ -164,14 +180,18 @@
         saucer.vy = randSign() * saucer.cfg.speed * 0.5;
         saucer.directionTimer = rand(1.2, 2.5);
       }
-      if (saucer.y < 30) saucer.vy = Math.abs(saucer.vy);
-      if (saucer.y > getHeight() - 30) saucer.vy = -Math.abs(saucer.vy);
-
-      if (saucer.vx > 0 && saucer.x > getWidth() + 40) {
-        setSaucer(null);
-        return;
-      }
-      if (saucer.vx < 0 && saucer.x < -40) {
+      if (!nonEuclid) {
+        if (saucer.y < 30) saucer.vy = Math.abs(saucer.vy);
+        if (saucer.y > getHeight() - 30) saucer.vy = -Math.abs(saucer.vy);
+        if (saucer.vx > 0 && saucer.x > getWidth() + 40) {
+          setSaucer(null);
+          return;
+        }
+        if (saucer.vx < 0 && saucer.x < -40) {
+          setSaucer(null);
+          return;
+        }
+      } else if (isOutsideNonEuclideanFarField(saucer, (saucer.r || 0) + 260)) {
         setSaucer(null);
         return;
       }
@@ -466,6 +486,7 @@
       const saucerBullets = getSaucerBullets();
       const width = getWidth();
       const height = getHeight();
+      const nonEuclid = isNonEuclideanActive();
 
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
@@ -474,11 +495,13 @@
         b.x += b.vx * dt;
         b.y += b.vy * dt;
         b.life -= dt;
-        if (b.x < 0) b.x += width;
-        if (b.x > width) b.x -= width;
-        if (b.y < 0) b.y += height;
-        if (b.y > height) b.y -= height;
-        if (b.life <= 0) bullets.splice(i, 1);
+        if (!nonEuclid) {
+          if (b.x < 0) b.x += width;
+          if (b.x > width) b.x -= width;
+          if (b.y < 0) b.y += height;
+          if (b.y > height) b.y -= height;
+        }
+        if (b.life <= 0 || isOutsideNonEuclideanFarField(b, (b.r || 1.5) + 120)) bullets.splice(i, 1);
       }
       for (let i = saucerBullets.length - 1; i >= 0; i--) {
         const b = saucerBullets[i];
@@ -487,11 +510,13 @@
         b.x += b.vx * dt;
         b.y += b.vy * dt;
         b.life -= dt;
-        if (b.x < 0) b.x += width;
-        if (b.x > width) b.x -= width;
-        if (b.y < 0) b.y += height;
-        if (b.y > height) b.y -= height;
-        if (b.life <= 0) saucerBullets.splice(i, 1);
+        if (!nonEuclid) {
+          if (b.x < 0) b.x += width;
+          if (b.x > width) b.x -= width;
+          if (b.y < 0) b.y += height;
+          if (b.y > height) b.y -= height;
+        }
+        if (b.life <= 0 || isOutsideNonEuclideanFarField(b, (b.r || 2.0) + 120)) saucerBullets.splice(i, 1);
       }
     }
 
