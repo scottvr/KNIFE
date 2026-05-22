@@ -1,0 +1,56 @@
+
+<link rel="stylesheet" href="./styles/game.css">
+<div id="copro-app">
+  <div id="copro-stage">
+    <canvas id="copro-canvas" width="600" height="600"></canvas>
+    <canvas id="copro-paper" width="600" height="600" aria-hidden="true"></canvas>
+    <div id="copro-overlay-top">
+      <div id="copro-hud">
+        <span>Score <strong id="score">0</strong></span>
+        <span>Best <strong id="best">0</strong></span>
+        <span>Lvl <strong id="level">1</strong></span>
+        <span>Goal <strong id="goal">0</strong></span>
+        <span>Ctrl <strong id="ctrl-mode">Direct</strong></span>
+      </div>
+      <div id="copro-controls">
+        <button id="btn-start" title="Start (Space)">Start</button>
+        <button id="btn-pause" title="Pause (Space)">Pause</button>
+        <button id="btn-mode" title="Control mode (C)">Mode</button>
+        <button id="btn-help" title="Instructions (H)">How To</button>
+        <button id="btn-restart" style="display:none" title="Restart">Reset</button>
+      </div>
+    </div>
+    <div id="copro-msg" aria-live="polite">Press Space to Begin</div>
+    <div id="copro-toasts" aria-live="polite" aria-atomic="false"></div>
+    <div id="copro-perks" aria-live="polite" aria-atomic="false"></div>
+    <div id="copro-help" class="is-hidden" role="dialog" aria-modal="true" aria-labelledby="copro-help-title">
+      <div class="help-head">
+        <h2 id="copro-help-title">How To Play</h2>
+        <button id="btn-help-close" title="Close instructions">Close</button>
+      </div>
+      <div class="help-copy">
+        <div>Eat dung, grow larva, hit the goal, survive.</div>
+        <ul>
+          <li>Direct mode: arrows/WASD set heading.</li>
+          <li>Steer mode: left/up = turn left, right/down = turn right.</li>
+          <li>Space: start/pause. C: toggle control mode. V: desktop d-pad toggle.</li>
+          <li>Perks auto-trigger when they can save/help you.</li>
+        </ul>
+      </div>
+      <div id="copro-help-perks" aria-live="polite"></div>
+    </div>
+    <div class="dpad" aria-label="Direction controls">
+      <div class="blank"></div>
+      <button data-dir="U" aria-label="Up">▲</button>
+      <div class="blank"></div>
+      <button data-dir="L" aria-label="Left">◀</button>
+      <div class="blank"></div>
+      <button data-dir="R" aria-label="Right">▶</button>
+      <div class="blank"></div>
+      <button data-dir="D" aria-label="Down">▼</button>
+      <div class="blank"></div>
+    </div>
+  </div>
+</div>
+<script src="./shaders/paper_texture1.js"></script>
+<script src="./scripts/game.js"></script>
