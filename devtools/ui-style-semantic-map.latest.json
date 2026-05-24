@@ -7959,7 +7959,7 @@
           "line": 731,
           "componentName": "FractalDesignerOverlay",
           "tag": "button",
-          "context": "onClick={() => setGoblinMode((prev) => !prev)} className={`rounded-lg border px-3 py-2 text-[11px] font-semibold tracking-wide transition-colors ${ goblinMode"
+          "context": "onClick={() => setNeckbeardMode((prev) => !prev)} className={`rounded-lg border px-3 py-2 text-[11px] font-semibold tracking-wide transition-colors ${ neckbeardMode"
         },
         {
           "file": "src/components/ui/FractalDesignerOverlay.tsx",
@@ -20463,7 +20463,7 @@
           "line": 929,
           "componentName": "FractalDesignerOverlay",
           "tag": "pre",
-          "context": "{goblinMode && ( <pre className=\"mt-3 whitespace-pre-wrap break-words rounded-xl border border-fuchsia-300/20 bg-fuchsia-500/10 p-3 font-mono text-[10px] leading-relaxed text-fuchsia-100/..."
+          "context": "{neckbeardMode && ( <pre className=\"mt-3 whitespace-pre-wrap break-words rounded-xl border border-fuchsia-300/20 bg-fuchsia-500/10 p-3 font-mono text-[10px] leading-relaxed text-fuchsia-100/..."
         }
       ]
     },
@@ -20530,7 +20530,7 @@
           "line": 731,
           "componentName": "FractalDesignerOverlay",
           "tag": "button",
-          "context": "onClick={() => setGoblinMode((prev) => !prev)} className={`rounded-lg border px-3 py-2 text-[11px] font-semibold tracking-wide transition-colors ${ goblinMode"
+          "context": "onClick={() => setNeckbeardMode((prev) => !prev)} className={`rounded-lg border px-3 py-2 text-[11px] font-semibold tracking-wide transition-colors ${ neckbeardMode"
         }
       ]
     },
@@ -21267,7 +21267,7 @@
           "line": 929,
           "componentName": "FractalDesignerOverlay",
           "tag": "pre",
-          "context": "{goblinMode && ( <pre className=\"mt-3 whitespace-pre-wrap break-words rounded-xl border border-fuchsia-300/20 bg-fuchsia-500/10 p-3 font-mono text-[10px] leading-relaxed text-fuchsia-100/..."
+          "context": "{neckbeardMode && ( <pre className=\"mt-3 whitespace-pre-wrap break-words rounded-xl border border-fuchsia-300/20 bg-fuchsia-500/10 p-3 font-mono text-[10px] leading-relaxed text-fuchsia-100/..."
         }
       ]
     },
@@ -21334,7 +21334,7 @@
           "line": 731,
           "componentName": "FractalDesignerOverlay",
           "tag": "button",
-          "context": "onClick={() => setGoblinMode((prev) => !prev)} className={`rounded-lg border px-3 py-2 text-[11px] font-semibold tracking-wide transition-colors ${ goblinMode"
+          "context": "onClick={() => setNeckbeardMode((prev) => !prev)} className={`rounded-lg border px-3 py-2 text-[11px] font-semibold tracking-wide transition-colors ${ neckbeardMode"
         }
       ]
     },
@@ -23072,7 +23072,7 @@
           "line": 731,
           "componentName": "FractalDesignerOverlay",
           "tag": "button",
-          "context": "onClick={() => setGoblinMode((prev) => !prev)} className={`rounded-lg border px-3 py-2 text-[11px] font-semibold tracking-wide transition-colors ${ goblinMode"
+          "context": "onClick={() => setNeckbeardMode((prev) => !prev)} className={`rounded-lg border px-3 py-2 text-[11px] font-semibold tracking-wide transition-colors ${ neckbeardMode"
         }
       ]
     },
@@ -23139,7 +23139,7 @@
           "line": 929,
           "componentName": "FractalDesignerOverlay",
           "tag": "pre",
-          "context": "{goblinMode && ( <pre className=\"mt-3 whitespace-pre-wrap break-words rounded-xl border border-fuchsia-300/20 bg-fuchsia-500/10 p-3 font-mono text-[10px] leading-relaxed text-fuchsia-100/..."
+          "context": "{neckbeardMode && ( <pre className=\"mt-3 whitespace-pre-wrap break-words rounded-xl border border-fuchsia-300/20 bg-fuchsia-500/10 p-3 font-mono text-[10px] leading-relaxed text-fuchsia-100/..."
         }
       ]
     },
