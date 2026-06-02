@@ -14,6 +14,7 @@
       </div>
       <div id="copro-controls">
         <button id="btn-start" title="Start (Space)">Start</button>
+        <button id="btn-select" title="Character select">Select</button>
         <button id="btn-pause" title="Pause (Space)">Pause</button>
         <button id="btn-mode" title="Control mode (C)">Mode</button>
         <button id="btn-help" title="Instructions (H)">How To</button>
@@ -21,6 +22,31 @@
       </div>
     </div>
     <div id="copro-msg" aria-live="polite">Press Space to Begin</div>
+    <section id="copro-start" aria-labelledby="copro-start-title">
+      <div class="start-card">
+        <p class="kicker">Mode Select</p>
+        <h1 id="copro-start-title">Choose Your Critter</h1>
+        <p class="subtitle">Gameplay is unchanged. Pick your look and vibe.</p>
+        <div class="start-options">
+          <label class="start-option">
+            <input type="radio" name="character-mode" value="worm" checked>
+            <span class="icon">🪱</span>
+            <span class="name">Coprophage</span>
+            <span class="desc">Paper-cut larva with shader texture stack.</span>
+          </label>
+          <label class="start-option">
+            <input type="radio" name="character-mode" value="snake">
+            <span class="icon">🐍</span>
+            <span class="name">Snake</span>
+            <span class="desc">Smooth camo skin and a more natural field feel.</span>
+          </label>
+        </div>
+        <div class="start-actions">
+          <button id="btn-launch" type="button">Start Run</button>
+          <span class="hint">Tip: Space starts instantly with current selection.</span>
+        </div>
+      </div>
+    </section>
     <div id="copro-toasts" aria-live="polite" aria-atomic="false"></div>
     <div id="copro-perks" aria-live="polite" aria-atomic="false"></div>
     <div id="copro-help" class="is-hidden" role="dialog" aria-modal="true" aria-labelledby="copro-help-title">
@@ -52,5 +78,8 @@
     </div>
   </div>
 </div>
+<script src="./scripts/paper/palette.js"></script>
+<script src="./scripts/paper/materials.js"></script>
+<script src="./scripts/paper/art-direction.js"></script>
 <script src="./shaders/paper_texture1.js"></script>
 <script src="./scripts/game.js"></script>

@@ -2,6 +2,8 @@
     --copro-bg-1: #100904;
     --copro-bg-2: #2a1609;
     --copro-bg-3: #1f1108;
+    --copro-paper-palette-name: darkBrown;
+    --copro-paper-base: #5f4230;
     --copro-ink: #f2d8a4;
     --copro-muted: #cda872;
     --copro-panel: rgba(33, 19, 11, 0.72);
@@ -162,6 +164,155 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  #copro-stage.is-start-screen #copro-overlay-top {
+    opacity: 0.35;
+    transition: opacity 180ms ease;
+  }
+
+  #copro-stage.is-start-screen #copro-msg {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  #copro-start {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background:
+      radial-gradient(120% 90% at 50% 18%, rgba(14, 24, 19, 0.18), rgba(7, 8, 6, 0.56)),
+      linear-gradient(160deg, rgba(8, 6, 5, 0.52), rgba(24, 16, 10, 0.66));
+    backdrop-filter: blur(2px);
+  }
+
+  #copro-start.is-open {
+    display: flex;
+  }
+
+  #copro-start .start-card {
+    width: min(560px, calc(100% - 12px));
+    border-radius: 18px;
+    border: 1px solid rgba(248, 223, 179, 0.34);
+    background:
+      radial-gradient(110% 130% at 50% 0%, rgba(86, 59, 32, 0.64), rgba(28, 16, 9, 0.92)),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.18));
+    box-shadow: 0 22px 46px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 232, 193, 0.2);
+    padding: 18px 18px 16px;
+  }
+
+  #copro-start .kicker {
+    margin: 0 0 5px;
+    color: #eccd97;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font: 800 11px/1 "Consolas", "Courier New", monospace;
+  }
+
+  #copro-start h1 {
+    margin: 0;
+    color: #ffebc3;
+    font: 800 clamp(29px, 5vw, 42px)/0.98 "Trebuchet MS", "Segoe UI", sans-serif;
+    text-shadow: 0 4px 0 rgba(0, 0, 0, 0.22);
+  }
+
+  #copro-start .subtitle {
+    margin: 8px 0 0;
+    color: #e0b980;
+    font: 700 14px/1.32 "Consolas", "Courier New", monospace;
+  }
+
+  #copro-start .start-options {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+  }
+
+  #copro-start .start-option {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "icon name"
+      "icon desc";
+    gap: 2px 10px;
+    padding: 12px 11px 11px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 223, 170, 0.25);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.12));
+    color: #f6dfb1;
+    cursor: pointer;
+    transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease;
+  }
+
+  #copro-start .start-option:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 225, 168, 0.52);
+  }
+
+  #copro-start .start-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  #copro-start .start-option .icon {
+    grid-area: icon;
+    font-size: 24px;
+    align-self: center;
+    filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.36));
+  }
+
+  #copro-start .start-option .name {
+    grid-area: name;
+    font: 800 17px/1.04 "Trebuchet MS", "Segoe UI", sans-serif;
+  }
+
+  #copro-start .start-option .desc {
+    grid-area: desc;
+    font: 700 12px/1.25 "Consolas", "Courier New", monospace;
+    color: #ddb47d;
+  }
+
+  #copro-start .start-option.is-selected {
+    border-color: rgba(255, 224, 145, 0.86);
+    background: linear-gradient(180deg, rgba(255, 243, 212, 0.2), rgba(102, 66, 26, 0.28));
+    box-shadow: inset 0 0 0 1px rgba(255, 221, 148, 0.33), 0 8px 16px rgba(0, 0, 0, 0.2);
+  }
+
+  #copro-start .start-actions {
+    margin-top: 13px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  #btn-launch {
+    border: 1px solid rgba(255, 222, 157, 0.68);
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ffd593, #cf8c36);
+    color: #2d1706;
+    font: 800 14px/1 "Consolas", "Courier New", monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 10px 14px;
+    cursor: pointer;
+  }
+
+  #btn-launch:hover {
+    filter: brightness(1.06);
+  }
+
+  #copro-start .hint {
+    color: #e0b980;
+    font: 700 11px/1.2 "Consolas", "Courier New", monospace;
+    letter-spacing: 0.01em;
   }
 
   #copro-toasts {
@@ -467,6 +618,49 @@
       text-align: center;
       font-size: 18px;
       padding: 8px 12px;
+    }
+
+    #copro-start {
+      padding: 10px;
+    }
+
+    #copro-start .start-card {
+      width: min(100%, 460px);
+      border-radius: 14px;
+      padding: 14px 12px 12px;
+    }
+
+    #copro-start .start-options {
+      grid-template-columns: 1fr;
+      gap: 7px;
+      margin-top: 11px;
+    }
+
+    #copro-start h1 {
+      font-size: clamp(24px, 9vw, 34px);
+    }
+
+    #copro-start .subtitle {
+      font-size: 12px;
+      margin-top: 6px;
+    }
+
+    #copro-start .start-option {
+      padding: 10px;
+    }
+
+    #copro-start .start-option .name {
+      font-size: 15px;
+    }
+
+    #copro-start .start-option .desc {
+      font-size: 11px;
+    }
+
+    #btn-launch {
+      width: 100%;
+      text-align: center;
+      padding: 10px 12px;
     }
 
     #copro-toasts {

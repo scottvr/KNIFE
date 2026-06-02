@@ -19,6 +19,7 @@ uniform vec2 u_play_band;
 uniform float u_tick;
 uniform float u_time;
 uniform float u_intensity;
+uniform vec3 u_paper_base;
 
 float hash12(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -83,7 +84,7 @@ void main() {
   float layer_shadow = clamp(layer_shape - layer_offset, 0.0, 1.0);
   tonal -= layer_shadow * 0.14;
 
-  vec3 paper_tone = vec3(0.56, 0.47, 0.39) + tonal;
+  vec3 paper_tone = u_paper_base + tonal;
   float alpha = clamp((0.34 + abs(tonal) * 0.55) * u_intensity, 0.0, 0.64);
   alpha *= band;
 

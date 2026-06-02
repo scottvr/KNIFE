@@ -26,10 +26,14 @@
   const stage = document.getElementById("copro-stage");
   const dpad = document.querySelector(".dpad");
   const msg = document.getElementById("copro-msg");
+  const startPanel = document.getElementById("copro-start");
+  const startOptions = Array.from(document.querySelectorAll('input[name="character-mode"]'));
   const toastHost = document.getElementById("copro-toasts");
   const perkHud = document.getElementById("copro-perks");
   const helpPanel = document.getElementById("copro-help");
   const btnStart = document.getElementById("btn-start");
+  const btnSelect = document.getElementById("btn-select");
+  const btnLaunch = document.getElementById("btn-launch");
   const btnPause = document.getElementById("btn-pause");
   const btnMode = document.getElementById("btn-mode");
   const btnHelp = document.getElementById("btn-help");
@@ -91,9 +95,9 @@
   let tutorialPerkKey = null;
   let pendingPerkTutorials = [];
   let seenPerks = {};
-  let paperPass = null;
+  let paperRuntime = null;
+  let paperArt = null;
   let nextSegmentId = 1;
-  let playfieldPaperCanvas = null;
   const perks = {
     gutShield: 0,
     molting: 0,
@@ -157,6 +161,7 @@
   const STEP_SFX_VOLUME = 0.01;
   const BEST_SCORE_STORAGE_KEY = "coprophage_best_score_v1";
   const SEEN_PERKS_STORAGE_KEY = "coprophage_seen_perks_v1";
+  const CHARACTER_MODE_STORAGE_KEY = "coprophage_character_mode_v1";
   const PERK_TUTORIAL_MS = 4400;
   const ROUND_START_DELAY_MS = 3000;
   const MULTI_FOOD_START_LEVEL = 3;
@@ -229,9 +234,110 @@
     transposeMaxLeadMidi: 84
   };
   const MUSIC_ARRANGEMENT = expandMusicShape(MUSIC_THEME.shape);
+  const CHARACTER_MODES = {
+    worm: {
+      id: "worm",
+      paper: true,
+      idleTitle: "COPROPHAGE",
+      idleSubtitle: "paper-cut larva mode"
+    },
+    snake: {
+      id: "snake",
+      paper: false,
+      idleTitle: "SNAKE",
+      idleSubtitle: "scaled field mode"
+    }
+  };
+  let characterMode = "worm";
 
   function setMessage(text) {
     msg.textContent = text;
+  }
+
+  function getCharacterModeConfig() {
+    return CHARACTER_MODES[characterMode] || CHARACTER_MODES.worm;
+  }
+
+  function isPaperCharacterMode() {
+    return !!getCharacterModeConfig().paper;
+  }
+
+  function loadCharacterMode() {
+    try {
+      const raw = window.localStorage.getItem(CHARACTER_MODE_STORAGE_KEY);
+      if (!raw) return "worm";
+      if (!CHARACTER_MODES[raw]) return "worm";
+      return raw;
+    } catch (err) {
+      return "worm";
+    }
+  }
+
+  function saveCharacterMode() {
+    try {
+      window.localStorage.setItem(CHARACTER_MODE_STORAGE_KEY, characterMode);
+    } catch (err) {
+      // Ignore storage failures.
+    }
+  }
+
+  function syncCharacterOptionUI() {
+    startOptions.forEach(function (input) {
+      const selected = input.value === characterMode;
+      input.checked = selected;
+      const label = input.closest(".start-option");
+      if (label) label.classList.toggle("is-selected", selected);
+    });
+  }
+
+  function applyCharacterMode(mode) {
+    if (!CHARACTER_MODES[mode]) return;
+    characterMode = mode;
+    saveCharacterMode();
+    syncCharacterOptionUI();
+    if (paperCanvas) {
+      paperCanvas.classList.toggle("is-disabled", !isPaperCharacterMode());
+    }
+    stage.setAttribute("data-character-mode", characterMode);
+  }
+
+  function setStartPanelOpen(open) {
+    if (!startPanel) return;
+    startPanel.classList.toggle("is-open", open);
+    stage.classList.toggle("is-start-screen", open);
+    syncControls();
+  }
+
+  function showCharacterSelect() {
+    if (gameState !== "idle" && gameState !== "dead") {
+      pushToast("Pause or finish the run before changing character.", "bad");
+      return;
+    }
+    setStartPanelOpen(true);
+    setMessage("Choose your critter.");
+    syncControls();
+    drawIdle();
+  }
+
+  function characterBoardTheme() {
+    if (characterMode === "snake") {
+      return {
+        glowInner: "#607551",
+        glowMid: "#36472f",
+        glowOuter: "#171f16",
+        band: "rgba(10, 20, 12, 0.53)",
+        line: "rgba(225, 240, 211, 0.09)",
+        border: "#22311f",
+      };
+    }
+    return {
+      glowInner: "#7d525d",
+      glowMid: PALETTE.bg,
+      glowOuter: "#2a1318",
+      band: "rgba(38, 16, 22, 0.5)",
+      line: "rgba(255, 214, 192, 0.09)",
+      border: PALETTE.soilDark,
+    };
   }
 
   function perkMetaByKey(key) {
@@ -600,66 +706,6 @@
       s.push({ x: cell.x, y: cell.y, id: nextSegmentId++ });
     }
     return s;
-  }
-
-  function seededRandom(seed) {
-    let t = seed >>> 0;
-    return function () {
-      t += 0x6d2b79f5;
-      let v = Math.imul(t ^ (t >>> 15), 1 | t);
-      v ^= v + Math.imul(v ^ (v >>> 7), 61 | v);
-      return ((v ^ (v >>> 14)) >>> 0) / 4294967296;
-    };
-  }
-
-  function hash2(a, b) {
-    let h = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b);
-    h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
-    h ^= Math.imul(b ^ 0x27d4eb2d, 0x165667b1);
-    return h >>> 0;
-  }
-
-  function ensurePlayfieldPaperTexture() {
-    if (
-      playfieldPaperCanvas &&
-      playfieldPaperCanvas.width === canvas.width &&
-      playfieldPaperCanvas.height === PLAY_HEIGHT
-    ) return;
-
-    playfieldPaperCanvas = document.createElement("canvas");
-    playfieldPaperCanvas.width = canvas.width;
-    playfieldPaperCanvas.height = PLAY_HEIGHT;
-    const pctx = playfieldPaperCanvas.getContext("2d");
-    const rand = seededRandom(0x53a1f00d);
-
-    pctx.fillStyle = "#563038";
-    pctx.fillRect(0, 0, playfieldPaperCanvas.width, playfieldPaperCanvas.height);
-
-    for (let i = 0; i < 2200; i++) {
-      const x = rand() * playfieldPaperCanvas.width;
-      const y = rand() * playfieldPaperCanvas.height;
-      const r = 0.7 + rand() * 2.6;
-      const light = rand() > 0.72;
-      const shade = light ? 220 : 36;
-      const alpha = light ? 0.06 : 0.05;
-      pctx.fillStyle = "rgba(" + shade + "," + (shade - 8) + "," + (shade - 14) + "," + alpha + ")";
-      pctx.beginPath();
-      pctx.arc(x, y, r, 0, Math.PI * 2);
-      pctx.fill();
-    }
-
-    for (let i = 0; i < 1400; i++) {
-      const x = rand() * playfieldPaperCanvas.width;
-      const y = rand() * playfieldPaperCanvas.height;
-      const len = 2 + rand() * 6;
-      const ang = (rand() - 0.5) * 0.9;
-      pctx.strokeStyle = "rgba(244, 224, 196, 0.045)";
-      pctx.lineWidth = 0.6 + rand() * 0.7;
-      pctx.beginPath();
-      pctx.moveTo(x, y);
-      pctx.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
-      pctx.stroke();
-    }
   }
 
   function isSafeStartMove(moveDir, segments) {
@@ -1495,160 +1541,40 @@
     }, 1550);
   }
 
-  function disablePaperOverlay() {
-    if (!paperCanvas) return;
-    paperCanvas.classList.add("is-disabled");
-    paperPass = null;
-  }
+  function initPaperPipeline() {
+    if (paperRuntime) return;
+    if (!window.COPRO_PAPER_MATERIALS || !window.COPRO_PAPER_ART) return;
 
-  function syncPaperCanvasSize() {
-    if (!paperCanvas) return;
-    if (paperCanvas.width !== canvas.width) paperCanvas.width = canvas.width;
-    if (paperCanvas.height !== canvas.height) paperCanvas.height = canvas.height;
-  }
-
-  function compilePaperShader(gl, type, source) {
-    const shader = gl.createShader(type);
-    if (!shader) return null;
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-      console.warn("Paper shader compile failed:", gl.getShaderInfoLog(shader));
-      gl.deleteShader(shader);
-      return null;
-    }
-    return shader;
-  }
-
-  function buildPaperProgram(gl, vertexSource, fragmentSource) {
-    const vertexShader = compilePaperShader(gl, gl.VERTEX_SHADER, vertexSource);
-    const fragmentShader = compilePaperShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
-    if (!vertexShader || !fragmentShader) {
-      if (vertexShader) gl.deleteShader(vertexShader);
-      if (fragmentShader) gl.deleteShader(fragmentShader);
-      return null;
-    }
-
-    const program = gl.createProgram();
-    if (!program) return null;
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-    gl.deleteShader(vertexShader);
-    gl.deleteShader(fragmentShader);
-
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.warn("Paper shader link failed:", gl.getProgramInfoLog(program));
-      gl.deleteProgram(program);
-      return null;
-    }
-    return program;
-  }
-
-  function initPaperOverlay() {
-    if (!paperCanvas) return;
-
-    const sources = window.COPRO_PAPER_SHADER;
-    if (!sources || !sources.vertex || !sources.fragment) {
-      disablePaperOverlay();
-      return;
-    }
-
-    const gl = paperCanvas.getContext("webgl2", {
-      alpha: true,
-      antialias: false,
-      depth: false,
-      stencil: false,
-      premultipliedAlpha: true,
-      preserveDrawingBuffer: false,
-    });
-    if (!gl) {
-      disablePaperOverlay();
-      return;
-    }
-
-    const program = buildPaperProgram(gl, sources.vertex, sources.fragment);
-    if (!program) {
-      disablePaperOverlay();
-      return;
-    }
-
-    const vao = gl.createVertexArray();
-    const buffer = gl.createBuffer();
-    if (!vao || !buffer) {
-      disablePaperOverlay();
-      return;
-    }
-
-    gl.bindVertexArray(vao);
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-      -1, -1,
-      3, -1,
-      -1, 3
-    ]), gl.STATIC_DRAW);
-
-    const positionLoc = gl.getAttribLocation(program, "a_position");
-    if (positionLoc === -1) {
-      disablePaperOverlay();
-      return;
-    }
-    gl.enableVertexAttribArray(positionLoc);
-    gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
-    gl.bindVertexArray(null);
-
-    paperPass = {
-      gl,
-      program,
-      vao,
-      uniforms: {
-        resolution: gl.getUniformLocation(program, "u_resolution"),
-        playBand: gl.getUniformLocation(program, "u_play_band"),
-        tick: gl.getUniformLocation(program, "u_tick"),
-        time: gl.getUniformLocation(program, "u_time"),
-        intensity: gl.getUniformLocation(program, "u_intensity"),
+    paperRuntime = window.COPRO_PAPER_MATERIALS.createRuntime({
+      canvas: canvas,
+      paperCanvas: paperCanvas,
+      getPlayBounds: function () {
+        return {
+          top: PLAY_TOP,
+          bottom: PLAY_BOTTOM,
+          height: PLAY_HEIGHT,
+        };
       },
-      startMs: performance.now(),
-    };
-
-    paperCanvas.classList.remove("is-disabled");
-    syncPaperCanvasSize();
+      getFrame: function () { return frame || 0; },
+      getGameState: function () { return gameState; },
+      getEffects: function () { return effects; },
+      getLevel: function () { return level || 1; },
+    });
+    paperArt = window.COPRO_PAPER_ART.createArtDirector(paperRuntime);
+    paperRuntime.init();
   }
 
   function renderPaperOverlay() {
-    if (!paperPass || !paperCanvas) return;
-
-    syncPaperCanvasSize();
-    const gl = paperPass.gl;
-    const elapsed = 0;
-    const playMin = 1 - PLAY_BOTTOM / canvas.height;
-    const playMax = 1 - PLAY_TOP / canvas.height;
-    let intensity = 1.0;
-
-    if (gameState === "idle") intensity = 0.58;
-    if (Date.now() < effects.burstUntil) intensity = 0.66;
-
-    gl.viewport(0, 0, paperCanvas.width, paperCanvas.height);
-    gl.disable(gl.DEPTH_TEST);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.useProgram(paperPass.program);
-    gl.bindVertexArray(paperPass.vao);
-    gl.uniform2f(paperPass.uniforms.resolution, paperCanvas.width, paperCanvas.height);
-    gl.uniform2f(paperPass.uniforms.playBand, playMin, playMax);
-    gl.uniform1f(paperPass.uniforms.tick, 0);
-    gl.uniform1f(paperPass.uniforms.time, elapsed);
-    gl.uniform1f(paperPass.uniforms.intensity, intensity);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindVertexArray(null);
+    if (!isPaperCharacterMode()) return;
+    if (!paperRuntime) return;
+    paperRuntime.renderOverlay();
   }
 
   function init() {
-    if (!paperPass) initPaperOverlay();
+    initPaperPipeline();
+    characterMode = loadCharacterMode();
+    applyCharacterMode(characterMode);
     nextSegmentId = 1;
-    ensurePlayfieldPaperTexture();
     clearRoundIntroTimers();
     clearBurstTimer();
     clearPerkTutorialTimer();
@@ -1679,7 +1605,8 @@
     updateHUD();
     syncControls();
     setDpadVisible(SHOW_DPAD_BY_DEFAULT, false);
-    setMessage("Press Space to Begin");
+    setStartPanelOpen(true);
+    setMessage("Choose your critter.");
     drawIdle();
   }
 
@@ -1755,10 +1682,11 @@
   function syncControls() {
     btnRestart.style.display = gameState === "idle" ? "none" : "inline-flex";
     btnPause.textContent = gameState === "paused" ? "Resume" : "Pause";
-    btnStart.textContent = "Start";
+    btnStart.textContent = startPanel && startPanel.classList.contains("is-open") ? "Play" : "Start";
     btnStart.disabled = gameState === "running" || gameState === "round_intro" || gameState === "perk_tutorial" || gameState === "help";
     btnPause.disabled = gameState === "help" || gameState === "perk_tutorial";
     btnMode.disabled = gameState === "help";
+    if (btnSelect) btnSelect.disabled = gameState !== "idle" && gameState !== "dead";
     btnHelp.textContent = gameState === "help" ? "Close" : "How To";
   }
 
@@ -1791,15 +1719,19 @@
     speed = START_SPEED;
     frame = 0;
     nextSegmentId = 1;
-    ensurePlayfieldPaperTexture();
+    setStartPanelOpen(true);
+    if (paperRuntime) paperRuntime.onResize();
     setupRound();
     updateHUD();
+    setMessage("Choose your critter.");
   }
 
   function startGame() {
     if (gameState === "running" || gameState === "round_intro") return;
     ensureAudio();
+    setStartPanelOpen(false);
     if (gameState === "idle" || gameState === "dead") resetGame();
+    setStartPanelOpen(false);
     beginRoundIntro(false);
   }
 
@@ -2049,66 +1981,35 @@
   }
 
   function drawGrid() {
+    const board = characterBoardTheme();
     const w = canvas.width;
     const h = canvas.height;
     const glow = ctx.createRadialGradient(w * 0.5, h * 0.38, 50, w * 0.5, h * 0.4, w * 0.72);
-    glow.addColorStop(0, "#7d525d");
-    glow.addColorStop(0.5, PALETTE.bg);
-    glow.addColorStop(1, "#2a1318");
+    glow.addColorStop(0, board.glowInner);
+    glow.addColorStop(0.5, board.glowMid);
+    glow.addColorStop(1, board.glowOuter);
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, w, h);
 
-    ctx.fillStyle = "rgba(38, 16, 22, 0.5)";
+    ctx.fillStyle = board.band;
     ctx.fillRect(0, 0, w, PLAY_TOP);
     ctx.fillRect(0, PLAY_BOTTOM, w, h - PLAY_BOTTOM);
 
-    ctx.fillStyle = "rgba(255, 214, 192, 0.09)";
+    ctx.fillStyle = board.line;
     ctx.fillRect(0, PLAY_TOP - 1, w, 1);
     ctx.fillRect(0, PLAY_BOTTOM, w, 1);
-
-    ensurePlayfieldPaperTexture();
-    ctx.drawImage(playfieldPaperCanvas, 0, PLAY_TOP);
-
-    function drawWobbleLine(x1, y1, x2, y2, seed) {
-      const wobble = 0.65 + (seed % 7) * 0.08;
-      const cx = (x1 + x2) * 0.5 + ((seed & 1 ? 1 : -1) * wobble);
-      const cy = (y1 + y2) * 0.5 + (((seed >> 1) & 1 ? 1 : -1) * wobble * 2.1);
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.quadraticCurveTo(cx, cy, x2, y2);
+    if (isPaperCharacterMode() && paperRuntime) paperRuntime.drawPlayfieldPaper(ctx);
+    if (isPaperCharacterMode() && paperArt) {
+      paperArt.drawGridLines(ctx, {
+        cols: PLAY_COLS,
+        rows: PLAY_ROWS,
+        cell: CELL,
+        playTop: PLAY_TOP,
+        playBottom: PLAY_BOTTOM,
+      });
     }
 
-    for (let x = 0; x <= PLAY_COLS; x++) {
-      const xPos = x * CELL;
-      const seed = hash2(x, 11);
-      const jTop = ((seed & 15) - 7) * 0.06;
-      const jBottom = (((seed >> 4) & 15) - 7) * 0.06;
-      drawWobbleLine(xPos + jTop, PLAY_TOP, xPos + jBottom, PLAY_BOTTOM, seed);
-      ctx.strokeStyle = "rgba(44, 21, 26, 0.45)";
-      ctx.lineWidth = 1.05;
-      ctx.stroke();
-      drawWobbleLine(xPos + jTop + 0.28, PLAY_TOP, xPos + jBottom + 0.28, PLAY_BOTTOM, seed + 17);
-      ctx.strokeStyle = "rgba(208, 161, 140, 0.12)";
-      ctx.lineWidth = 0.45;
-      ctx.stroke();
-    }
-
-    for (let y = 0; y <= PLAY_ROWS; y++) {
-      const yPos = PLAY_TOP + y * CELL;
-      const seed = hash2(y, 29);
-      const jLeft = ((seed & 15) - 7) * 0.06;
-      const jRight = (((seed >> 4) & 15) - 7) * 0.06;
-      drawWobbleLine(0, yPos + jLeft, PLAY_COLS * CELL, yPos + jRight, seed);
-      ctx.strokeStyle = "rgba(44, 21, 26, 0.45)";
-      ctx.lineWidth = 1.05;
-      ctx.stroke();
-      drawWobbleLine(0, yPos + jLeft + 0.24, PLAY_COLS * CELL, yPos + jRight + 0.24, seed + 13);
-      ctx.strokeStyle = "rgba(208, 161, 140, 0.11)";
-      ctx.lineWidth = 0.45;
-      ctx.stroke();
-    }
-
-    ctx.strokeStyle = PALETTE.soilDark;
+    ctx.strokeStyle = board.border;
     ctx.lineWidth = 2;
     ctx.strokeRect(1, PLAY_TOP + 1, PLAY_COLS * CELL - 2, PLAY_HEIGHT - 2);
   }
@@ -2173,41 +2074,44 @@
     });
   }
 
-  function drawSnake() {
-    function drawSegmentPaperGrain(cx, cy, rx, ry, angle, seed) {
-      const rand = seededRandom(seed);
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(angle);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
-      ctx.clip();
+  function catmullRomPoint(p0, p1, p2, p3, t) {
+    const t2 = t * t;
+    const t3 = t2 * t;
+    return {
+      x: 0.5 * (
+        (2 * p1.x) +
+        (-p0.x + p2.x) * t +
+        (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+        (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
+      ),
+      y: 0.5 * (
+        (2 * p1.y) +
+        (-p0.y + p2.y) * t +
+        (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+        (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+      )
+    };
+  }
 
-      for (let i = 0; i < 6; i++) {
-        const y = (rand() - 0.5) * ry * 1.8;
-        const len = rx * (0.75 + rand() * 0.35);
-        const alpha = 0.06 + rand() * 0.07;
-        ctx.strokeStyle = "rgba(248, 230, 182, " + alpha + ")";
-        ctx.lineWidth = 0.55 + rand() * 0.8;
-        ctx.beginPath();
-        ctx.moveTo(-len, y);
-        ctx.lineTo(len, y + (rand() - 0.5) * 1.2);
-        ctx.stroke();
+  function buildSnakeSpine(points, samplesPerSegment) {
+    if (!points || points.length === 0) return [];
+    if (points.length === 1) return [{ x: points[0].x, y: points[0].y }];
+    const sampled = [];
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i - 1] || points[i];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[i + 2] || p2;
+      const steps = i === points.length - 2 ? samplesPerSegment + 1 : samplesPerSegment;
+      for (let j = 0; j < steps; j++) {
+        const t = j / samplesPerSegment;
+        sampled.push(catmullRomPoint(p0, p1, p2, p3, t));
       }
-
-      for (let i = 0; i < 4; i++) {
-        const px = (rand() - 0.5) * rx * 1.65;
-        const py = (rand() - 0.5) * ry * 1.65;
-        const pr = 0.7 + rand() * 1.3;
-        ctx.fillStyle = "rgba(64, 38, 11, " + (0.06 + rand() * 0.05) + ")";
-        ctx.beginPath();
-        ctx.arc(px, py, pr, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      ctx.restore();
     }
+    return sampled;
+  }
 
+  function drawWorm() {
     const len = snake.length;
     for (let i = len - 1; i >= 1; i--) {
       const s = snake[i];
@@ -2229,7 +2133,17 @@
       ctx.strokeStyle = PALETTE.segOutline;
       ctx.lineWidth = 0.7;
       ctx.stroke();
-      drawSegmentPaperGrain(cx2, cy2, segR, segR * (isEnd ? 0.72 : 0.88), segAngle, hash2(s.id || i, 71));
+      if (paperArt) {
+        paperArt.drawSegmentPaperGrain(ctx, {
+          cx: cx2,
+          cy: cy2,
+          rx: segR,
+          ry: segR * (isEnd ? 0.72 : 0.88),
+          angle: segAngle,
+          segmentId: s.id || i,
+          frame: frame,
+        });
+      }
       if (!isEnd) {
         const ncx = prev.x * CELL + CELL / 2;
         const ncy = PLAY_TOP + prev.y * CELL + CELL / 2;
@@ -2254,7 +2168,17 @@
     ctx.strokeStyle = "#4a2e05";
     ctx.lineWidth = 0.9;
     ctx.stroke();
-    drawSegmentPaperGrain(hx, hy, hr, hr * 0.84, angle, hash2(h.id || 0, 79));
+    if (paperArt) {
+      paperArt.drawSegmentPaperGrain(ctx, {
+        cx: hx,
+        cy: hy,
+        rx: hr,
+        ry: hr * 0.84,
+        angle: angle,
+        segmentId: h.id || 0,
+        frame: frame,
+      });
+    }
     const ex1x = hx + Math.cos(angle + 0.5) * hr * 0.55;
     const ex1y = hy + Math.sin(angle + 0.5) * hr * 0.55;
     const ex2x = hx + Math.cos(angle - 0.5) * hr * 0.55;
@@ -2307,6 +2231,263 @@
     }
   }
 
+  function drawSnake() {
+    if (characterMode !== "snake") {
+      drawWorm();
+      return;
+    }
+    const len = snake.length;
+    if (len === 0) return;
+
+    const centers = snake.map(function (segment) {
+      return {
+        x: segment.x * CELL + CELL / 2,
+        y: PLAY_TOP + segment.y * CELL + CELL / 2
+      };
+    });
+
+    const heading = len > 1
+      ? Math.atan2(centers[0].y - centers[1].y, centers[0].x - centers[1].x)
+      : Math.atan2(dir.y, dir.x);
+    const dx = Math.cos(heading);
+    const dy = Math.sin(heading);
+    const sx = -dy;
+    const sy = dx;
+
+    if (len > 1) {
+      const headBack = {
+        x: centers[0].x - dx * CELL * 0.3,
+        y: centers[0].y - dy * CELL * 0.3
+      };
+      const bodyControl = [headBack].concat(centers.slice(1));
+      const spine = buildSnakeSpine(bodyControl, 4);
+      if (spine.length > 1) {
+        const left = [];
+        const right = [];
+        const normals = [];
+        const radii = [];
+        const last = spine.length - 1;
+        const neckR = CELL * 0.34;
+        const tailR = CELL * 0.11;
+
+        for (let i = 0; i <= last; i++) {
+          const prev = spine[Math.max(0, i - 1)];
+          const next = spine[Math.min(last, i + 1)];
+          let tx = next.x - prev.x;
+          let ty = next.y - prev.y;
+          const mag = Math.hypot(tx, ty) || 1;
+          tx /= mag;
+          ty /= mag;
+          const nx = -ty;
+          const ny = tx;
+          const t = i / Math.max(1, last);
+          const taper = Math.pow(1 - t, 0.72);
+          const r = tailR + (neckR - tailR) * taper;
+          normals.push({ x: nx, y: ny });
+          radii.push(r);
+          left.push({ x: spine[i].x + nx * r, y: spine[i].y + ny * r });
+          right.push({ x: spine[i].x - nx * r, y: spine[i].y - ny * r });
+        }
+
+        ctx.fillStyle = "rgba(10, 5, 2, 0.3)";
+        ctx.beginPath();
+        ctx.moveTo(left[0].x + 2, left[0].y + 3);
+        for (let i = 1; i < left.length; i++) ctx.lineTo(left[i].x + 2, left[i].y + 3);
+        for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i].x + 2, right[i].y + 3);
+        ctx.closePath();
+        ctx.fill();
+
+        const bodyGrad = ctx.createLinearGradient(spine[0].x, spine[0].y, spine[last].x, spine[last].y);
+        bodyGrad.addColorStop(0, "#b89756");
+        bodyGrad.addColorStop(0.35, "#9d7a3d");
+        bodyGrad.addColorStop(1, "#714f23");
+        ctx.fillStyle = bodyGrad;
+        ctx.strokeStyle = "#4e3417";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(left[0].x, left[0].y);
+        for (let i = 1; i < left.length; i++) ctx.lineTo(left[i].x, left[i].y);
+        for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i].x, right[i].y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(spine[0].x, spine[0].y);
+        for (let i = 1; i < spine.length; i++) ctx.lineTo(spine[i].x, spine[i].y);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = "rgba(63, 35, 12, 0.64)";
+        ctx.lineWidth = CELL * 0.14;
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(229, 192, 127, 0.28)";
+        ctx.lineWidth = CELL * 0.06;
+        ctx.stroke();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(left[0].x, left[0].y);
+        for (let i = 1; i < left.length; i++) ctx.lineTo(left[i].x, left[i].y);
+        for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i].x, right[i].y);
+        ctx.closePath();
+        ctx.clip();
+
+        for (let i = 3; i < spine.length - 4; i += 3) {
+          const n = normals[i];
+          const r = radii[i];
+          const prev = spine[i - 1];
+          const next = spine[i + 1];
+          let tx = next.x - prev.x;
+          let ty = next.y - prev.y;
+          const mag = Math.hypot(tx, ty) || 1;
+          tx /= mag;
+          ty /= mag;
+
+          const phase = i / Math.max(1, last);
+          const jitter = Math.sin(i * 1.73) * r * 0.22;
+          const cx = spine[i].x + n.x * jitter;
+          const cy = spine[i].y + n.y * jitter;
+          const major = r * (0.96 - phase * 0.18);
+          const minor = r * (0.5 + 0.1 * Math.sin(i * 0.77));
+
+          ctx.fillStyle = "rgba(77, 46, 19, 0.34)";
+          ctx.beginPath();
+          ctx.moveTo(cx + tx * major, cy + ty * major);
+          ctx.lineTo(cx + n.x * minor, cy + n.y * minor);
+          ctx.lineTo(cx - tx * major, cy - ty * major);
+          ctx.lineTo(cx - n.x * minor, cy - n.y * minor);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = "rgba(168, 131, 74, 0.17)";
+          ctx.beginPath();
+          ctx.moveTo(cx + tx * major * 0.5, cy + ty * major * 0.5);
+          ctx.lineTo(cx + n.x * minor * 0.45, cy + n.y * minor * 0.45);
+          ctx.lineTo(cx - tx * major * 0.5, cy - ty * major * 0.5);
+          ctx.lineTo(cx - n.x * minor * 0.45, cy - n.y * minor * 0.45);
+          ctx.closePath();
+          ctx.fill();
+
+          for (let side = -1; side <= 1; side += 2) {
+            if (((i + side) % 4) !== 0) continue;
+            const bx = spine[i].x + n.x * side * r * 0.62 + tx * Math.sin(i * 0.9) * r * 0.14;
+            const by = spine[i].y + n.y * side * r * 0.62 + ty * Math.sin(i * 1.1) * r * 0.12;
+            ctx.fillStyle = "rgba(59, 34, 14, 0.25)";
+            ctx.beginPath();
+            ctx.ellipse(
+              bx,
+              by,
+              r * 0.34,
+              r * 0.18,
+              Math.atan2(ty, tx) + side * 0.45,
+              0,
+              Math.PI * 2
+            );
+            ctx.fill();
+          }
+        }
+
+        ctx.restore();
+
+        const tail = spine[last];
+        const tailPrev = spine[last - 1];
+        const tailAngle = Math.atan2(tail.y - tailPrev.y, tail.x - tailPrev.x);
+        const tx = Math.cos(tailAngle);
+        const ty = Math.sin(tailAngle);
+        const tnx = -ty;
+        const tny = tx;
+        const tailTipLen = CELL * 0.24;
+        const tailBaseR = Math.max(CELL * 0.06, radii[last] * 0.75);
+        ctx.fillStyle = "#6b4820";
+        ctx.beginPath();
+        ctx.moveTo(tail.x + tx * tailTipLen, tail.y + ty * tailTipLen);
+        ctx.lineTo(tail.x + tnx * tailBaseR, tail.y + tny * tailBaseR);
+        ctx.lineTo(tail.x - tnx * tailBaseR, tail.y - tny * tailBaseR);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    const hx = centers[0].x;
+    const hy = centers[0].y;
+    const hrx = CELL * 0.5;
+    const hry = CELL * 0.38;
+    const snoutX = hx + dx * hrx * 0.55;
+    const snoutY = hy + dy * hrx * 0.55;
+    const headGrad = ctx.createRadialGradient(snoutX, snoutY, hrx * 0.12, hx, hy, hrx * 1.2);
+    headGrad.addColorStop(0, "#d7bb7c");
+    headGrad.addColorStop(0.55, "#b38b47");
+    headGrad.addColorStop(1, "#805b29");
+    ctx.fillStyle = headGrad;
+    ctx.beginPath();
+    ctx.ellipse(hx, hy, hrx, hry, heading, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#4c2f14";
+    ctx.lineWidth = 1.15;
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(247, 230, 187, 0.34)";
+    ctx.beginPath();
+    ctx.ellipse(
+      hx - dx * hrx * 0.15 + sx * hrx * 0.16,
+      hy - dy * hrx * 0.15 + sy * hrx * 0.16,
+      hrx * 0.25,
+      hry * 0.17,
+      heading - 0.3,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+
+    const eyeForward = 0.18;
+    const eyeSide = 0.34;
+    const eyeLift = 0.12;
+    const eyeRadius = Math.max(2, CELL * 0.08);
+    const pupilRadius = Math.max(1, eyeRadius * 0.48);
+    ctx.fillStyle = "#f7efda";
+    for (let side = -1; side <= 1; side += 2) {
+      const ex = hx + dx * hrx * eyeForward + sx * hrx * eyeSide * side;
+      const ey = hy + dy * hrx * eyeForward + sy * hrx * eyeSide * side - eyeLift;
+      ctx.beginPath();
+      ctx.arc(ex, ey, eyeRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#1e1308";
+      ctx.beginPath();
+      ctx.arc(ex + dx * pupilRadius * 0.8, ey + dy * pupilRadius * 0.8, pupilRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(ex + 0.45, ey - 0.8, Math.max(0.6, pupilRadius * 0.34), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#f7efda";
+    }
+
+    const noseForward = hrx * 0.72;
+    const noseSide = hrx * 0.12;
+    ctx.fillStyle = "rgba(36, 20, 8, 0.7)";
+    ctx.beginPath();
+    ctx.arc(hx + dx * noseForward + sx * noseSide, hy + dy * noseForward + sy * noseSide, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(hx + dx * noseForward - sx * noseSide, hy + dy * noseForward - sy * noseSide, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (frame % 18 < 7) {
+      const tongueBaseX = hx + dx * hrx * 0.86;
+      const tongueBaseY = hy + dy * hrx * 0.86;
+      const tongueLen = CELL * 0.3 + Math.sin(frame * 0.75) * CELL * 0.03;
+      const forkSpread = CELL * 0.08;
+      ctx.strokeStyle = "#8f2f2b";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(tongueBaseX, tongueBaseY);
+      ctx.lineTo(tongueBaseX + dx * tongueLen + sx * forkSpread, tongueBaseY + dy * tongueLen + sy * forkSpread);
+      ctx.moveTo(tongueBaseX, tongueBaseY);
+      ctx.lineTo(tongueBaseX + dx * tongueLen - sx * forkSpread, tongueBaseY + dy * tongueLen - sy * forkSpread);
+      ctx.stroke();
+    }
+  }
+
   function drawParticles() {
     for (const p of particles) {
       ctx.globalAlpha = p.life / p.maxLife;
@@ -2334,6 +2515,7 @@
   }
 
   function drawIdle() {
+    const modeConfig = getCharacterModeConfig();
     drawGrid();
     ctx.fillStyle = "rgba(30,17,8,0.72)";
     ctx.fillRect(0, PLAY_TOP, canvas.width, PLAY_HEIGHT);
@@ -2342,11 +2524,11 @@
     ctx.font = "bold 62px Trebuchet MS, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("COPROPHAGE", canvas.width / 2, midY - 40);
+    ctx.fillText(modeConfig.idleTitle, canvas.width / 2, midY - 40);
     ctx.fillStyle = PALETTE.textDim;
     ctx.font = "bold 24px Consolas, monospace";
-    ctx.fillText("larva mode engaged", canvas.width / 2, midY + 8);
-    ctx.fillText("space, tap, or d-pad", canvas.width / 2, midY + 44);
+    ctx.fillText(modeConfig.idleSubtitle, canvas.width / 2, midY + 8);
+    ctx.fillText("select and press start", canvas.width / 2, midY + 44);
     renderPaperOverlay();
   }
 
@@ -2435,6 +2617,16 @@
   }
 
   btnStart.addEventListener("click", startGame);
+  if (btnSelect) {
+    btnSelect.addEventListener("click", function () {
+      showCharacterSelect();
+    });
+  }
+  if (btnLaunch) {
+    btnLaunch.addEventListener("click", function () {
+      startGame();
+    });
+  }
   btnPause.addEventListener("click", pauseGame);
   btnMode.addEventListener("click", function () {
     cycleControlMode(true);
@@ -2449,6 +2641,15 @@
   btnRestart.addEventListener("click", function () {
     resetGame();
     startGame();
+  });
+
+  startOptions.forEach(function (input) {
+    input.addEventListener("change", function () {
+      applyCharacterMode(input.value);
+      if (gameState === "idle" || gameState === "dead") {
+        drawIdle();
+      }
+    });
   });
 
   document.querySelectorAll(".dpad button[data-dir]").forEach(function (btn) {
@@ -2554,8 +2755,7 @@
 
   window.addEventListener("resize", function () {
     applyPerkHudLayout();
-    ensurePlayfieldPaperTexture();
-    syncPaperCanvasSize();
+    if (paperRuntime) paperRuntime.onResize();
   });
 
   init();
