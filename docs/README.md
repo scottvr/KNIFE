@@ -89,9 +89,9 @@ https://github.com/user-attachments/assets/59b95f4b-a19e-43cf-848e-2469912f3518
 
 These are pretty low-quality, both in compression and the fact that I was pointing the phone at a laptop to take them (it's an x86-era macbook air; it doesn't handle realtime WebGL and videocapture simultaneously very well) but I wanted to show a couple of things. 
 - This was when I added the ability to adjust the exponent from the standard (z^8 + x) to a range of -20 to +20 which can result in interesting variations on the shape, especially (to me) at lower powers, particularly in the -2 < 4 range.
-- Further I have tweaked it by replacing the trig functions used to convert between spherical and cartesian coordinates in ways I have little undertanding of what or why it is actually doing what it does (in fact I've even added a `randomize` button to choose, well, _random_ tweaks to the algorithm by swapping in and out different trigonometric functions, axes and exponents, because YOLO!) but to me the results are fascinating, and I spend far too much time watching 3D fractals animate these days. As such,  I am always adding new features out of curiosity and for the joy it brings me.
+- Further I have tweaked it allowing targetted (or random!) replacement of  the trig functions used to convert between spherical and cartesian coordinates, as well as tweaking or cycling axes and exponents, in many, many combinations ensuring you can generate a 3D mandelbulb-type fractal that has likely never been seen before. I am always adding new features out of curiosity and for the joy it brings me. I hope you get something out of it too.
 
-So the first thing I'll show cuz it's a little better quality than the video, is the first image I got where I felt like it truly resembled a figure completely made of a smooth, shiny metallic surface. (It is also blue, because since I was a kid, I've loved that polished blue metallic look, which may distract from the metallic intent I guess.)
+The first thing I'll show fron those enhancements, is the first image I got where I felt like it truly resembled a figure with a smooth, shiny metallic surface. (It is also blue-tinted via the global lighting color, because since I was a kid, I've loved that polished blue metallic look, which may distract from the metallic intent I guess.)
 
 ![decent_chrome-look](https://github.com/user-attachments/assets/37f40f95-74cb-44a6-99f8-d54ff6901feb)
 
@@ -133,4 +133,3 @@ https://github.com/user-attachments/assets/46f995da-a030-4220-b148-d935c1d37f0d
 
 
 https://github.com/user-attachments/assets/f711a095-2734-41b9-a895-3d1243539094
-
