@@ -56,7 +56,7 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 - Reset Ladder: Advanced reset tiers are keyboard-only.
 - Undo Last Volumetric Action: Volumetric workspace only; one-step undo depth.
 - Locate Lost Object (Volumetric): Available only in volumetric workspace; no direct canvas gesture binding.
-- Debug Console: Intentional goblin-mode keyboard access.
+- Debug Console: Intentional neckbeard-mode keyboard access.
 - Design Mode (MVP): Pointer/touch path is available from the equation panel once opened.
 <!-- AUTO-GEN:INPUT_MAP:END -->
 
