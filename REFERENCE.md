@@ -51,6 +51,7 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 | Design Mode (MVP) | g (toggle) | Equation panel -> Sigma button | Equation panel -> Sigma button | partial |
 | Palette Studio | y (toggle) | Palette menu -> Open Palette Studio | Palette menu -> Open Palette Studio | full |
 | Fractal Equation | e | Context panel -> Peek | Context panel -> Peek | full |
+| Sound (experimental) | a (toggle), Shift+a (quieter), Alt/Option+a (louder) | Speaker button below Reset View (toggle only) | Speaker button below Reset View (toggle only) | partial |
 
 **Parity Gaps**
 - Reset Ladder: Advanced reset tiers are keyboard-only.
@@ -58,6 +59,7 @@ Source of truth: `src/config/inputRegistry.ts` (via `src/config/inputMap.ts`).
 - Locate Lost Object (Volumetric): Available only in volumetric workspace; no direct canvas gesture binding.
 - Debug Console: Intentional neckbeard-mode keyboard access.
 - Design Mode (MVP): Pointer/touch path is available from the equation panel once opened.
+- Sound (experimental): Requires experimental features. Volume is keyboard-only for now.
 <!-- AUTO-GEN:INPUT_MAP:END -->
 
 ## Core navigation

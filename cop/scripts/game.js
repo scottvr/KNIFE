@@ -163,7 +163,7 @@
   const SEEN_PERKS_STORAGE_KEY = "coprophage_seen_perks_v1";
   const CHARACTER_MODE_STORAGE_KEY = "coprophage_character_mode_v1";
   const PERK_TUTORIAL_MS = 4400;
-  const ROUND_START_DELAY_MS = 3000;
+  const ROUND_START_DELAY_MS = 4000;
   const MULTI_FOOD_START_LEVEL = 3;
   const MAX_FOOD_COUNT = 4;
   const TEMP_FOOD_TTL_BASE = 24;
